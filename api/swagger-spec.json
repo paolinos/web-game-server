@@ -1,0 +1,1 @@
+{"openapi":"3.0.0","paths":{"/":{"get":{"operationId":"AppController_getHello","parameters":[],"responses":{"200":{"description":""}},"tags":["App"]}}},"info":{"title":"Api - Game","description":"Not much to say....","version":"0.0.1","contact":{}},"tags":[],"servers":[],"components":{"schemas":{}}}
