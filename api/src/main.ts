@@ -14,6 +14,7 @@ async function bootstrap() {
     .setTitle('Api - Game')
     .setDescription("Not much to say....")
     .setVersion("0.0.1")
+    .addBearerAuth()
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
