@@ -3,8 +3,6 @@ import { User } from '../../domain/user';
 import { UserRepository } from '../../repositories/user.repository';
 import { parseToken, generateToken } from '../../common/auth/jwt.helper';
 
-const JWT_SECRET = "temp-secret"
-
 @Injectable()
 export class AuthService {
 
