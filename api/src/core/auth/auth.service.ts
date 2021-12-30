@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { sign, verify } from 'jsonwebtoken';
 import { User } from '../../domain/user';
 import { UserRepository } from '../../repositories/user.repository';
+import { parseToken, generateToken } from '../../common/auth/jwt.helper';
 
 const JWT_SECRET = "temp-secret"
 
@@ -15,12 +15,9 @@ export class AuthService {
     }
 
     async checkToken(token:string): Promise<boolean> {
-        try {
-            const result = verify(token, JWT_SECRET, {ignoreExpiration: false});
-            return !result;
-        } catch (error) {
-            return false;
-        }
+
+        const data = parseToken(token);
+        return !data;
     }
 
 
@@ -36,12 +33,6 @@ export class AuthService {
 
         let data:object = { email: email, last: user.lastSigin };
 
-        return sign(
-            {
-                exp: Math.floor(Date.now() / 1000) + (60 * 60),
-                data,
-            }, 
-            JWT_SECRET
-        );
+        return generateToken(data);
     }
 }
