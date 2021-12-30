@@ -1,11 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { sign, verify } from 'jsonwebtoken';
+import { User } from '../../domain/user';
+import { UserRepository } from '../../repositories/user.repository';
 
 const JWT_SECRET = "temp-secret"
 
 @Injectable()
 export class AuthService {
-    
+
+    private readonly userRepository:UserRepository;
+
+    constructor(userRepository:UserRepository){
+        this.userRepository = userRepository;
+    }
 
     async checkToken(token:string): Promise<boolean> {
         try {
@@ -18,8 +25,16 @@ export class AuthService {
 
 
     async signIn(email:string):Promise<string> {
-        //TODO: verify user not was already signed in
-        let data:object = { email: email, last: new Date() };
+
+        let user = await this.userRepository.getByEmail(email);
+        if(!user){
+            user = new User(email);
+        }else{
+            user.lastSigin = new Date();
+        }
+        await this.userRepository.save(user);
+
+        let data:object = { email: email, last: user.lastSigin };
 
         return sign(
             {
