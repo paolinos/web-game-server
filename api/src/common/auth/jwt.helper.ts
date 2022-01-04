@@ -16,7 +16,7 @@ export const parseToken = (token:string, ignoreExpiration:boolean=false):object|
         }
     } catch (error) {
         // NOTE: log in console
-        console.error(`parseToken ERROR: token: ${token} => `,error);
+        console.warn(`parseToken invalid. token : ${token} => `,error);
     }
     return null;
 }
