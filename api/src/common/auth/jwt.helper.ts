@@ -1,6 +1,6 @@
 import { sign, verify } from 'jsonwebtoken';
 
-const JWT_SECRET = "temp-secret"
+import { JWT_EXPIRATION, JWT_SECRET } from '../../consts';
 
 /**
  * 
@@ -29,7 +29,7 @@ export const parseToken = (token:string, ignoreExpiration:boolean=false):object|
 export const generateToken = (data:object) : string => {
     return sign(
         {
-            exp: Math.floor(Date.now() / 1000) + (60 * 60),
+            exp: Math.floor(Date.now() / 1000) + (60 * JWT_EXPIRATION),
             data,
         }, 
         JWT_SECRET
