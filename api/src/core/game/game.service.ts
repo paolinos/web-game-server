@@ -1,16 +1,30 @@
 import { Injectable } from '@nestjs/common';
 
+import { UserRepository } from '../../repositories/user.repository';
+import { UserStatus } from '../../domain/user';
+
+
 @Injectable()
 export class GameService {
 
+    constructor(
+		private readonly userRepository:UserRepository
+	){}
+
 	async searchGame(email:string):Promise<boolean>  {
 
-		// TODO: 
-		//    - get user
-		//    - check if user is already in a match (user disconnect or user leave the match)
-		//    - add user to get a match
+		const user = await this.userRepository.getByEmail(email);
+		if(user){
+			if(user.status === UserStatus.DEFAULT){
+				user.status = UserStatus.SEARCHING;
+				await this.userRepository.save(user);
 
-		return true;
+				// TODO: send message
 
+				return true;	
+			}
+		}
+
+		return false;
 	}
 }
