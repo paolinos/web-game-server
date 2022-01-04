@@ -1,14 +1,22 @@
 import { Injectable } from '@nestjs/common';
+import { User } from '../../domain/user';
+
+import { UserRepository } from '../../repositories/user.repository';
 
 @Injectable()
 export class UserService {
 
-	async getUserByEmail(email:string):Promise<{email:string, points:number}>  {
+	private readonly userRepository:UserRepository;
 
-		// TODO: 
-		//    - get user
-		//    - return user
+	constructor(
+		userRepository:UserRepository
+	){
+		this.userRepository = userRepository;
+	}
 
-		return {email:email, points:1000}
+	async getUserByEmail(email:string):Promise<User>  {
+
+		const user = await this.userRepository.getByEmail(email);
+		return user;
 	}
 }
