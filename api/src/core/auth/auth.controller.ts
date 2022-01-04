@@ -1,9 +1,10 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, UnauthorizedException } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, UnauthorizedException, Request, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { AuthService } from './auth.service';
 import { AuthDto } from './auth.dto';
 import { TokenDto } from './token.dto';
+import { AuthGuardButContinue } from '../../common/auth/auth.guard';
 
 
 @ApiTags('Auth')
@@ -11,12 +12,17 @@ import { TokenDto } from './token.dto';
 export class AuthController {
     constructor(private readonly authService: AuthService) {}
 
+    @ApiBearerAuth()
+	@UseGuards(AuthGuardButContinue)
     @HttpCode(HttpStatus.ACCEPTED)
     @Get()
-    async checkAuthentication(): Promise<void> {
+    async checkAuthentication(@Request() req): Promise<void> {
         
-        // TODO: check token if not return 403
-        const tokenOk = await this.authService.checkToken("some string token");
+        let tokenOk = false;
+        if(req.scope && req.scope.token){
+            tokenOk = await this.authService.checkToken(req.scope.token);
+        }
+
         if(!tokenOk){
             throw new UnauthorizedException();
         }
@@ -25,6 +31,7 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     @Post()
     async signIn(@Body() authDto: AuthDto): Promise<TokenDto> {
-        return new TokenDto(await this.authService.signIn(authDto.email));
+        const token = await this.authService.signIn(authDto.email);
+        return new TokenDto(token);
     }
 }
