@@ -15,7 +15,7 @@ export class AuthService {
     async checkToken(token:string): Promise<boolean> {
 
         const data = parseToken(token);
-        return !data;
+        return data !== null;
     }
 
 
