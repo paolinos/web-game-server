@@ -1,6 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
+
 import { UserDto } from './user.dto';
 import { Match } from './match';
+import { APP_RABBIT_SERVICE } from './app.const';
+import { CREATED_MATCH_EVENT } from '../microservice/rabbitmq/events';
 
 const PLAYERS_TO_PLAY:number = 2;
 
@@ -9,6 +13,10 @@ export class AppService {
 
 	private readonly userQueue:UserDto[] = [];
 	private readonly matchs: { [id: string]: Match } = {};
+
+	constructor(
+		@Inject(APP_RABBIT_SERVICE) private appRabbitService: ClientProxy
+	){}
 
 	async searchGameForUser(user:UserDto):Promise<void>{
 		// TODO:
@@ -32,12 +40,16 @@ export class AppService {
 		const playerOne = this.userQueue.shift();
 		const playerTwo = this.userQueue.shift();
 
-		// TODO: Create Match
+		// Create Match
 		const match = new Match([playerOne, playerTwo]);
 		this.matchs[match.id] = match;
 
-		// TODO: Notify api User's match
-		
+		// Notify api User's match
+		this.appRabbitService.emit(CREATED_MATCH_EVENT, match);
+
+		console.log(CREATED_MATCH_EVENT, match);
+
+		// TODO: Check if some match/game server is ready and notify
 	}
 
 }
