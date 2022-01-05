@@ -1,8 +1,23 @@
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+import { MicroserviceOptions } from '@nestjs/microservices';
+
+import { RABBIT_QUEUE_APP } from './consts';
+import { createRabbitOptions } from './microservice/rabbitmq/rabbit.module';
+import { AppModule } from './core/app.module';
+
+
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  await app.listen(3000);
+
+  //--------------------------------------------------------
+	//	"Microservices"
+
+  //  RabbitMQ Consumer - RABBIT_QUEUE_APP queue
+  const app = await NestFactory.createMicroservice<MicroserviceOptions>(
+    AppModule,
+    createRabbitOptions(RABBIT_QUEUE_APP)
+  );
+
+  await app.listen();
 }
 bootstrap();
