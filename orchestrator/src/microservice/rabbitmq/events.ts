@@ -1,0 +1,1 @@
+export const SEARCH_GAME_EVENT:string = "search-game-event";
