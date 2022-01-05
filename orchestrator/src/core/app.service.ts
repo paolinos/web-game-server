@@ -1,20 +1,43 @@
 import { Injectable } from '@nestjs/common';
 import { UserDto } from './user.dto';
+import { Match } from './match';
+
+const PLAYERS_TO_PLAY:number = 2;
 
 @Injectable()
 export class AppService {
 
-  async addUser(user:UserDto):Promise<void>{
+	private readonly userQueue:UserDto[] = [];
+	private readonly matchs: { [id: string]: Match } = {};
 
-    // TODO:
-    //  Add user to Queue
-    
-  }
+	async searchGameForUser(user:UserDto):Promise<void>{
+		// TODO:
+		//  Add user to Queue
+		const total = this.addUserIfNotExist(user);
+		if(total >= PLAYERS_TO_PLAY){
+			this.createMatch();
+		}
+	}
 
-  async checkMatch(){
+	private addUserIfNotExist(user:UserDto):number{
+		const pos = this.userQueue.findIndex(q => q.userId === user.userId);
+		if(pos === -1){
+			return this.userQueue.push(user);
+		}
+		return 0;
+	}
 
-    // TODO:
+	private createMatch(){
+		// Remove players from Queue
+		const playerOne = this.userQueue.shift();
+		const playerTwo = this.userQueue.shift();
 
-  }
+		// TODO: Create Match
+		const match = new Match([playerOne, playerTwo]);
+		this.matchs[match.id] = match;
+
+		// TODO: Notify api User's match
+		
+	}
 
 }

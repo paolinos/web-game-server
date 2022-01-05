@@ -15,11 +15,7 @@ export class AppController {
 
   @EventPattern(SEARCH_GAME_EVENT)
   async playerSearchingGame(data: UserDto):Promise<void> {
-
     //
-    await this.appService.addUser(data);
-
-
-    console.info("appService.gameInit");
+    await this.appService.searchGameForUser(data);
   }
 }
