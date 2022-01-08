@@ -1,11 +1,11 @@
-import { Match } from "../domain/match";
+import { Match, MatchStatus } from "../domain/match";
 import { Repository } from "./repository";
 
 export interface MatchQueries {
-    
+    updateMatchStatus(matchId:string, status:MatchStatus):Promise<void>;
 }
 
-export class MatchRepository extends Repository<Match>{
+export class MatchRepository extends Repository<Match> implements MatchQueries{
     
     /**
      * Add or Update
@@ -18,6 +18,13 @@ export class MatchRepository extends Repository<Match>{
             this.data.push(entity);
         }else{
             current.status = entity.status;
+        }
+    }
+
+    async updateMatchStatus(matchId: string, status: MatchStatus):Promise<void> {
+        const current = await this.getById(matchId);
+        if(current){
+            current.status = status;
         }
     }
 
