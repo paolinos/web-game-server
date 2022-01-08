@@ -25,7 +25,9 @@ export class GameService {
 				
 				// TODO:
 				//	 review Transactional outbox pattern or something similar
-				await this.userRepository.save(user);
+				//	Yes, we don't need to save becasue we are working with object, but should be nice to implement the Transactional outbox pattern. 
+				await this.userRepository.save(user);	// No needed, but we want to think that there is a DB.
+
 				await this.appRabbitService.emit(SEARCH_GAME_EVENT, { userId: user.id, username: user.email });
 
 				return true;	
