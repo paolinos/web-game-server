@@ -10,7 +10,7 @@ import {
 	SWAGGER_VERSION,
 	SWAGGER_PATH,
 	SWAGGER_JSON_PATH,
-	RABBIT_QUEUE_ORCHESTRATOR
+	RABBIT_QUEUE_MATCH
 } from './consts';
 import { createRabbitOptions } from './microservice/rabbitmq/rabbit.module';
 
@@ -19,7 +19,7 @@ async function bootstrap() {
 
 	//--------------------------------------------------------
 	//	"Microservices"
-	app.connectMicroservice(createRabbitOptions(RABBIT_QUEUE_ORCHESTRATOR));
+	app.connectMicroservice(createRabbitOptions(RABBIT_QUEUE_MATCH));
 
 	//--------------------------------------------------------
 	//	Swagger configuration
