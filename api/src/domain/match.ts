@@ -1,11 +1,11 @@
 import { IdEntity } from './id.entity';
-import { User } from "./user";
+import { User, UserInformation } from "./user";
 import { v4 as uuidv4 } from 'uuid';
 
 export class Match implements IdEntity{
     public id:string;
 
-    public users:User[] = [];
+    public users:UserInformation[] = [];
 
     public status:MatchStatus = MatchStatus.STAND_BY;
 
