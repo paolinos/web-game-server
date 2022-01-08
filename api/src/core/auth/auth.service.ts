@@ -29,6 +29,8 @@ export class AuthService {
         }
         await this.userRepository.save(user);
 
+        // TODO: Emit event to check if player was playing? 
+
         let data:object = { email: email, last: user.lastSigin };
 
         return generateToken(data);

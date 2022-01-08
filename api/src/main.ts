@@ -9,11 +9,17 @@ import {
 	SWAGGER_DESCRIPTION,
 	SWAGGER_VERSION,
 	SWAGGER_PATH,
-	SWAGGER_JSON_PATH
+	SWAGGER_JSON_PATH,
+	RABBIT_QUEUE_ORCHESTRATOR
 } from './consts';
+import { createRabbitOptions } from './microservice/rabbitmq/rabbit.module';
 
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
+
+	//--------------------------------------------------------
+	//	"Microservices"
+	app.connectMicroservice(createRabbitOptions(RABBIT_QUEUE_ORCHESTRATOR));
 
 	//--------------------------------------------------------
 	//	Swagger configuration
@@ -28,6 +34,9 @@ async function bootstrap() {
 	writeFileSync(SWAGGER_JSON_PATH, JSON.stringify(document));
 	SwaggerModule.setup(SWAGGER_PATH, app, document);
 
+
+	// Run
+	await app.startAllMicroservices();
 	await app.listen(PORT, () => {
 		console.log(`App listening at port: ${PORT}`);
 	});

@@ -1,7 +1,15 @@
 import { IdEntity } from './id.entity';
 import { v4 as uuidv4 } from 'uuid';
 
-export class User implements IdEntity{
+export interface UserInformation {
+    id:string;
+
+    email:string;
+
+    points:number;
+}
+
+export class User implements IdEntity, UserInformation{
     public id:string;
 
     public email:string;
