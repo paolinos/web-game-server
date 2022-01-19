@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, UnauthorizedException, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, UnauthorizedException, Request, UseGuards, BadRequestException } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { AuthService } from './auth.service';
@@ -31,6 +31,10 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     @Post()
     async signIn(@Body() authDto: AuthDto): Promise<TokenDto> {
+        if(!authDto.hasOwnProperty("email")){
+            throw new BadRequestException();
+        }
+
         const token = await this.authService.signIn(authDto.email);
         return new TokenDto(token);
     }
