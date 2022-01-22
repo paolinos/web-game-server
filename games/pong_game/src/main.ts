@@ -1,16 +1,7 @@
 import * as PIXI from 'pixi.js'
+import { GameEngine } from './render/game.engine';
 
-console.log("Hello");
-
-// Prepare area
-const app = new PIXI.Application({
-    width: 800, height: 600, 
-    backgroundColor: 0x1099bb, 
-    resolution: window.devicePixelRatio || 1, 
-    antialias: true 
-});
-document.body.appendChild(app.view);
-
+const app = new GameEngine();
 
 const container = new PIXI.Container();
 app.stage.addChild(container);
