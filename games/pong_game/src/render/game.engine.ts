@@ -4,11 +4,11 @@ export class GameEngine {
     
     private readonly app:PIXI.Application;
     
-    constructor(view:HTMLCanvasElement = null){
+    constructor(width:number, height:number,view:HTMLCanvasElement = null){
 
         let renderOptions:PIXI.IApplicationOptions = {
-            width: 800, 
-            height: 600, 
+            width, 
+            height, 
             backgroundColor: 0x1099bb, 
             resolution: window.devicePixelRatio || 1, 
             antialias: true
@@ -29,5 +29,9 @@ export class GameEngine {
 
     get ticker():PIXI.Ticker{
         return this.app.ticker
+    }
+
+    get view():HTMLCanvasElement{
+        return this.app.view;
     }
 }
