@@ -13,11 +13,10 @@ class PlayerLayout extends RenderableObject {
         super();
 
         this._name = createText(name);
-        this._name.y = 20;
         this._container.addChild(this._name);
 
-        this._points = createText(name);
-        this._points.y = 20;
+        this._points = createText("0");
+        this._points.y = this._name.height;
         this._container.addChild(this._points);
     }
 
@@ -37,14 +36,22 @@ export class GameLayout extends RenderableObject {
         super();
 
         this._player1 = new PlayerLayout(name1);
-        this._player1.setPos(HALF_WIDTH * 0.5, 20);
+        this._player1.setPos(HALF_WIDTH * 0.5, 10);
         this._container.addChild(this._player1.container);
 
         this._player2 = new PlayerLayout(name2);
-        this._player2.setPos(HALF_WIDTH + (HALF_WIDTH * 0.5), 20);
+        this._player2.setPos(HALF_WIDTH + (HALF_WIDTH * 0.5), 10);
         this._container.addChild(this._player2.container);
 
         this._container.addChild(createLineGraphics({x: HALF_WIDTH, y:0 }, {x:HALF_WIDTH, y: HEIGHT}));
         this._container.addChild(createLineGraphics({x: 0, y:HALF_HEIGHT }, {x:WIDTH, y: HALF_HEIGHT}));
+    }
+
+    updatePlayerOnePoints(value:number):void{
+        this._player1.point = value;
+    }
+
+    updatePlayerTwoPoints(value:number):void{
+        this._player2.point = value;
     }
 }
