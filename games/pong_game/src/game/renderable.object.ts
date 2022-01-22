@@ -1,4 +1,4 @@
-import { Container, Graphics } from 'pixi.js'
+import { Container } from 'pixi.js'
 
 import { BoundingBoxArea } from "./boundingbox.area";
 
@@ -16,6 +16,22 @@ export abstract class RenderableObject{
     constructor(){
         this._container = new Container();
     }
+
+    get x():number{
+        return this._container.x;
+    }
+
+    get y():number{
+        return this._container.y;
+    }
+
+    get container():Container{
+        return this._container;
+    }
+
+    setPos(x:number, y:number):void {
+        this._container.position.set(x,y);
+    }
 } 
 
 /**
@@ -32,22 +48,5 @@ export abstract class RenderableCollisionObject extends RenderableObject impleme
         );
     }
 
-    abstract update(delta:number);
+    abstract update(delta:number):void;
 } 
-
-/**
- * Create a rectangle graphics
- * @param {number} width 
- * @param {number} height 
- * @param {number} color  
- * @param {number} x (optional)
- * @param {number} y (optional)  
- * @returns {Graphics}
- */
-export const createRectGrahpics = (width:number, height:number, color:number=0xFFFFFF, x:number = 0, y:number = 0) => {
-    const graph = new Graphics();
-    graph.beginFill(color);
-    graph.drawRect(x, y, width, height);
-    graph.endFill();
-    return graph;
-}
