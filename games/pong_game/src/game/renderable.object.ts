@@ -32,6 +32,14 @@ export abstract class RenderableObject{
     setPos(x:number, y:number):void {
         this._container.position.set(x,y);
     }
+
+    show():void{
+        this._container.visible = true;
+    }
+    hide():void{
+        this._container.visible = false;
+    }
+
 } 
 
 /**
