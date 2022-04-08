@@ -1,3 +1,4 @@
+import { PlayerDto } from "../dtos/users.dto";
 
 
 export const WIDTH:number = 800;
@@ -6,7 +7,7 @@ export const HALF_WIDTH:number = WIDTH * 0.5;
 export const HALF_HEIGHT:number = HEIGHT * 0.5;
 
 export interface Game{
-    start():void;
+    start(players:PlayerDto[]):void;
     stop():void;
 }
 
