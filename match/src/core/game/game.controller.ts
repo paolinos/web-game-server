@@ -82,7 +82,7 @@ export class GameController extends GameBase  {
 
     private timeOver():void {
         clearTimeout(this.intervalTime);
-
+        console.log("Time Over");
         this._ws.server.emit("game-over");
     }
 }

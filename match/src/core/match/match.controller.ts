@@ -11,5 +11,7 @@ export class MatchController {
     @EventPattern(CREATED_MATCH_SERVER_EVENT)
     async created_match(data: any):Promise<void> {
         // TODO:
+
+        console.log("Create Match");
     }
 }
