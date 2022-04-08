@@ -83,6 +83,10 @@ export class GameLayout extends RenderableObject {
      * @param {boolean} value
      */
     displayUserLayout(value:boolean):void {
+        if(this._centerText){
+            this._centerText.visible = !value;
+        }
+        
         if(value){
             this._player1.show();
             this._player2.show();

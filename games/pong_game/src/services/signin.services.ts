@@ -21,7 +21,7 @@ export class SigninBusiness implements SigninService {
         // TODO: call services
 
         if(true){
-            this._token = "some token";
+            this._token = "some_token_" +  Math.floor(Math.random() * 1000);
         }
 
         return true;

@@ -5,6 +5,7 @@ import { GameLayout } from "./game.layout";
 import { Ball } from "./ball";
 import { checkBBCollision } from './boundingBox.collision';
 import { HEIGHT, WIDTH } from "./base";
+import { PlayerDto } from '../dtos/users.dto';
 
 const PADDLE_SPACE:number = 25;
 
@@ -18,11 +19,19 @@ export class PongGame implements Game {
 
     // TODO:
     private readonly _currentPlayer:Player;
+    private readonly _current:PlayerDto;
 
-    constructor(){
+    constructor(currentUser:string){
         this._app = new GameEngine(WIDTH, HEIGHT);
 
-        this._layout = new GameLayout("Player One", "Player Two");
+        //
+        this._current = new PlayerDto();
+        this._current.username = currentUser;
+        this._current.points = 0;
+
+
+        this._layout = new GameLayout(currentUser)
+        this._layout.updatePlayerOneName(currentUser);
         this._app.stage.addChild(this._layout.container);
 
         this._playerOne = new Player();
@@ -40,8 +49,22 @@ export class PongGame implements Game {
         this._currentPlayer = this._playerOne;
     }
 
+    private updateLayout(players:PlayerDto[])
+    {
+        for (const player of players) {
+            if(this._current.username === player.username){
+                this._layout.updatePlayerOnePoints(player.points);
+            }else{
+                this._layout.updatePlayerTwoName(player.username);
+                this._layout.updatePlayerTwoPoints(player.points);
+            }
+        }
+    }
 
-    start(): void {
+    start(players:PlayerDto[]): void {
+
+        this.updateLayout(players);
+        this._layout.displayUserLayout(true);
 
         // TODO:
         // Listen for animate update

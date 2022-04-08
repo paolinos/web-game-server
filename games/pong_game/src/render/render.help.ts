@@ -42,7 +42,7 @@ export const createText = (text:string, color:number=0xFFFFFF):Text => {
         text,
         {
             fontFamily: 'Arial', 
-            fontSize: 24, 
+            fontSize: 14, 
             fill: color, 
             align : 'center'
         }
