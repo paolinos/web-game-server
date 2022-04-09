@@ -5,6 +5,7 @@ import authRoutes from './auth.router';
 import gameRoutes from './game.router';
 import healthRoutes from './health.router';
 import userRoutes from './user.router';
+import { UnauthorizedError } from '../../../common/errors/unauthorized.error';
 
 const router = Router();
 
@@ -26,7 +27,13 @@ router.all('*', async (req:Request, res:Response) => {
 
 router.use(async (err:Error, req:Request, res:Response, next:Function) => {
     console.error(err.stack);
-    res.status(500).send('middleware  => Something broke!')
+
+    if(err instanceof UnauthorizedError){
+        return res.sendStatus(401);
+    }
+
+
+    res.status(500).send('middleware  => Something broke!');
 });
 
 
