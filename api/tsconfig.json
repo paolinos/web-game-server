@@ -1,16 +1,21 @@
 {
   "compilerOptions": {
+    "target": "es6",
     "module": "commonjs",
-    "declaration": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "target": "es2017",
     "sourceMap": true,
+    "strict": true,
+    "declaration": false,
+    "removeComments": true,
+    "esModuleInterop": true,
+    "incremental": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+
     "outDir": "./dist",
     "baseUrl": "./",
-    "incremental": true,
-    "skipLibCheck": true
+
+    //"emitDecoratorMetadata": true,
+    //"experimentalDecorators": true,
+    //"allowSyntheticDefaultImports": true,
   }
 }

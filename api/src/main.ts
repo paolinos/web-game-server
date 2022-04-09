@@ -1,3 +1,4 @@
+/*
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { writeFileSync } from 'fs';
@@ -42,3 +43,8 @@ async function bootstrap() {
 	});
 }
 bootstrap();
+*/
+
+import runApi from './public/api';
+
+runApi();
