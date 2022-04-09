@@ -2,13 +2,15 @@ import { User } from "../domain/user";
 import { Repository } from "./repository";
 
 export interface UserQueries {
-    getByEmail(email:string):Promise<User>;
+
+    getByEmail(email:string):Promise<User|null>;
+
 }
 
 export class UserRepository extends Repository<User> implements UserQueries{
     
-    async getByEmail(email: string): Promise<User> {
-        return await this.data.find(q => q.email === email);
+    async getByEmail(email: string): Promise<User|null> {
+        return this.data.find(q => q.email === email) || null;
     }
 
     /**
