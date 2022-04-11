@@ -23,11 +23,11 @@ export const getBearerTokenFromRequest = (request:Request): string|null => {
  * @param ignoreExpiration (optional) default false 
  * @returns object or null
  */
-export const parseToken = (token:string, ignoreExpiration:boolean=false):object|null => {
+export const parseToken = (token:string, ignoreExpiration:boolean=false):UserSession|null => {
     try {
         const result:any = verify(token, JWT_SECRET, {ignoreExpiration});
         if(result){
-            return result.data;
+            return result.data as UserSession;
         }
     } catch (error) {
         // NOTE: log in console

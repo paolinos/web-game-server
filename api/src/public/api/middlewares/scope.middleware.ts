@@ -1,10 +1,9 @@
 import { Request } from "express";
 import { UserSession } from "../../../application/interfaces/userSession.interface";
-import { parseToken } from "../../../common/auth/jwt.helper";
-import { getBearerTokenFromRequest } from "../tools/token.tools";
+import { getBearerTokenFromRequest, parseToken } from "../tools/token.tools";
 import {UnauthorizedError} from '../../../common/errors/unauthorized.error';
 
-class Scope{
+export class Scope{
 
     constructor(
         public readonly token:string,
@@ -17,12 +16,14 @@ export interface ScopeRequest extends Request{
 }
 
 // @ts-ignore
-export const authorizedUserMiddleware = async (req, _res, next) => {
+const authorizedUserMiddleware = (req, res, next) => {
     const token = getBearerTokenFromRequest(req);
+    
     if(token){
         const jwtObj = parseToken(token);
+
         if(jwtObj !== null){
-            req.scope = new Scope(token, jwtObj as UserSession);
+            req.scope = new Scope(token, jwtObj);
             next();
             return;
         }
@@ -32,3 +33,4 @@ export const authorizedUserMiddleware = async (req, _res, next) => {
     next(new UnauthorizedError());
 }
 
+export default authorizedUserMiddleware;

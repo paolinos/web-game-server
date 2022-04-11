@@ -2,10 +2,10 @@ import { IRouter } from 'express';
 import {Router} from 'express'
 import { GameService } from '../../../application/interfaces/game.service.interface';
 import { GameBusinessLogic } from '../../../application/services/game.service';
-import { authorizedUserMiddleware, ScopeRequest } from '../middlewares/scope.middleware';
+import authorizedUserMiddleware, { ScopeRequest } from '../middlewares/scope.middleware';
 import ContextUnitOfWork from '../../../repositories/unitOfWork';
 
-const gameRoutes = (service:GameService):IRouter => {
+export const gameRoutes = (service:GameService):IRouter => {
     const router = Router();
 
     /**
@@ -15,6 +15,7 @@ const gameRoutes = (service:GameService):IRouter => {
 
         const scopeReq = req as ScopeRequest;
         const result = await service.searchGame(scopeReq.scope.user.email);
+        
 		if(!result){
             // Bad Request
 			return res.status(400).json({error:"User already is searching"})
