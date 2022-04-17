@@ -1,7 +1,7 @@
 import { UserRepository } from '../../repositories/user.repository';
 import { UserStatus } from '../../domain/user';
 import { GameService } from '../interfaces/game.service.interface';
-import { publishSearchGame } from '../../public/pubsub/publishers/publish';
+import { publishSearchGame, publishStopSearchingGame } from '../../public/pubsub/publishers/publish';
 import { createErrorEmptyResult, createSuccessEmptyResult, EmptyObjectResult } from '../objectResult';
 
 
@@ -45,6 +45,11 @@ export class GameBusinessLogic implements GameService {
 				user.status = UserStatus.DEFAULT;
 
 				await this.userRepository.save(user);
+
+				await publishStopSearchingGame({
+					id: user.id,
+					email: user.email,
+				})
 
 				return createSuccessEmptyResult();
 			}else{

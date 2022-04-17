@@ -25,6 +25,7 @@ export const RABBIT_QUEUE_MATCH:string="game-queue-match";
 
 // Topics
 export const TOPIC_APP_SEARCH:string = "topic-app-search";
+export const TOPIC_APP_STOP_SEARCHING_GAME:string = "topic-app-stop-searching-game";
 export const TOPIC_MATCH_INIT:string = "topic-match-init";
 export const TOPIC_MATCH_END:string = "topic-match-end";
 export const TOPIC_MATCH_ERROR:string = "topic-match-error";
