@@ -45,6 +45,4 @@ async function bootstrap() {
 bootstrap();
 */
 
-import runApi from './public/api';
-
-runApi();
+import './public';
