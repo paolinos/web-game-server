@@ -2,6 +2,7 @@ import { User } from '../../domain/user';
 import { UserRepository } from '../../repositories/user.repository';
 import { AuthService } from '../interfaces/auth.service.interface';
 import { UserSession } from '../interfaces/userSession.interface';
+import { createSuccessResult, ObjectResult } from '../objectResult';
 
 export class AuthBusinessLogic implements AuthService {
 
@@ -11,7 +12,7 @@ export class AuthBusinessLogic implements AuthService {
         this.userRepository = userRepository;
     }
 
-    async signIn(email:string):Promise<UserSession> {
+    async signIn(email:string):Promise<ObjectResult<UserSession>> {
 
         let user = await this.userRepository.getByEmail(email);
         if(!user){
@@ -26,6 +27,6 @@ export class AuthBusinessLogic implements AuthService {
         //return generateToken(data);
 
         // TODO: just return User. to review this
-        return { email: user.email, last: user.lastSigin };
+        return createSuccessResult<UserSession>({ email: user.email, last: user.lastSigin });
     }
 }

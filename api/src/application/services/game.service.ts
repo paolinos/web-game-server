@@ -2,6 +2,7 @@ import { UserRepository } from '../../repositories/user.repository';
 import { UserStatus } from '../../domain/user';
 import { GameService } from '../interfaces/game.service.interface';
 import { publishSearchGame } from '../../public/pubsub/publishers/publish';
+import { createErrorEmptyResult, createSuccessEmptyResult, EmptyObjectResult } from '../objectResult';
 
 
 
@@ -12,7 +13,7 @@ export class GameBusinessLogic implements GameService {
 		//private broker:MessageBrokerService
 	){}
 
-	async searchGame(email:string):Promise<boolean>  {
+	async searchGame(email:string):Promise<EmptyObjectResult>  {
 
 		const user = await this.userRepository.getByEmail(email);
 		if(user){
@@ -28,14 +29,16 @@ export class GameBusinessLogic implements GameService {
 					email: user.email,
 				})
 
-				return true;	
+				return createSuccessEmptyResult();
+			}else{
+				return createErrorEmptyResult("User already is searching");
 			}
 		}
 
-		return false;
+		return createErrorEmptyResult("404");
 	}
 
-	async cancelSearchGame(email:string):Promise<boolean> {
+	async cancelSearchGame(email:string):Promise<EmptyObjectResult> {
 		const user = await this.userRepository.getByEmail(email);
 		if(user){
 			if(user.status === UserStatus.SEARCHING){
@@ -43,9 +46,11 @@ export class GameBusinessLogic implements GameService {
 
 				await this.userRepository.save(user);
 
-				return true;
+				return createSuccessEmptyResult();
+			}else{
+				return createErrorEmptyResult("User is not searching");
 			}
 		}
-		return false;
+		return createErrorEmptyResult("404");
 	}
 }

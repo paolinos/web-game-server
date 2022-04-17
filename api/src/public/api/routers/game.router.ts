@@ -16,9 +16,11 @@ export const gameRoutes = (service:GameService):IRouter => {
         const scopeReq = req as ScopeRequest;
         const result = await service.searchGame(scopeReq.scope.user.email);
         
-		if(!result){
-            // Bad Request
-			return res.status(400).json({error:"User already is searching"})
+		if(!result.isValid()){
+            if(result.error === "404"){
+                return res.status(404).json()    
+            }
+			return res.status(400).json({error: result.error});
 		}
 
         // Accepted
@@ -28,10 +30,13 @@ export const gameRoutes = (service:GameService):IRouter => {
     router.delete('/search', authorizedUserMiddleware,  async (req, res) => {
         const scopeReq = req as ScopeRequest;
         const result = await service.cancelSearchGame(scopeReq.scope.user.email);
-        if(!result){
-            // Bad Request  
-            return res.sendStatus(400);
-        }
+        
+        if(!result.isValid()){
+            if(result.error === "404"){
+                return res.status(404).json()    
+            }
+			return res.status(400).json({error: result.error});
+		}
 
         res.sendStatus(202);
     });
