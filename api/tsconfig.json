@@ -12,7 +12,7 @@
     "forceConsistentCasingInFileNames": true,
 
     "outDir": "./dist",
-    "baseUrl": "./",
+    "baseUrl": "./src",
 
     //"emitDecoratorMetadata": true,
     //"experimentalDecorators": true,

@@ -13,7 +13,6 @@ export class UserService {
 	}
 
 	async getUserByEmail(email:string):Promise<User>  {
-
-		return await this.userRepository.getByEmail(email);
+		return await this.userRepository.getByEmail(email) as User;
 	}
 }
