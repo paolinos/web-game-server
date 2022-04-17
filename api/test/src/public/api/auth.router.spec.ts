@@ -34,7 +34,7 @@ describe('Auth Router', function() {
             const email = "user-email@test.com";
             const token = "some-token-test";
 
-            const signInMock = authServiceMock.signInMock(email);
+            const signInMock = authServiceMock.signInMock(true, email);
             const generateTokenMock = createGenerateTokenMock(token);
 
             const response  = await request(app).post('/').send({email: email});
@@ -48,7 +48,7 @@ describe('Auth Router', function() {
         });
 
         test('should return 400 when email in body is missing', async () => {
-            const signInMock = authServiceMock.signInMock("email@test.com");
+            const signInMock = authServiceMock.signInMock(true, "email@test.com");
             const generateTokenMock = createGenerateTokenMock("some-token-test");
 
             const response  = await request(app).post('/');
@@ -61,6 +61,7 @@ describe('Auth Router', function() {
 
 
         test('should return 500 when signIn service fail', async () => {
+            const signInMock = authServiceMock.signInMock(false, "email@test.com", "404");
             const generateTokenMock = createGenerateTokenMock("some-token-test");
 
             const response  = await request(app).post('/').send({email: "some@email.com"});
