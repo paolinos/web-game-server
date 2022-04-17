@@ -1,10 +1,17 @@
 export class EmptyObjectResult{
+    private readonly _error:string|null;
     constructor(
-        public readonly error:string|null
-    ) { }
+        error:string|null
+    ) { 
+        this._error = error;
+    }
 
     isValid(){
-        return this.error === null;
+        return this._error === null;
+    }
+
+    get error():string{
+        return this._error as string;
     }
 }
 
@@ -18,11 +25,18 @@ export const createErrorEmptyResult = (error:string):EmptyObjectResult => {
 
 
 export class ObjectResult<T> extends EmptyObjectResult {
+    private readonly _data:T|null;
+
     constructor(
-        public readonly data:T|null,
+        data:T|null,
         error:string|null
     ) {
-        super(error)
+        super(error);
+        this._data = data
+    }
+
+    get data():T{
+        return this._data as T;
     }
 }
 
