@@ -1,7 +1,8 @@
 import { IRouter, Request } from 'express';
 import {Router} from 'express'
 import { AuthService } from '../../../application/interfaces/auth.service.interface';
-import authorizedUserMiddleware, {ScopeRequest} from '../middlewares/scope.middleware';
+import { UserSession } from "../../../application/interfaces/userSession.interface";
+import authorizedUserMiddleware from '../middlewares/scope.middleware';
 import {AuthBusinessLogic} from '../../../application/services/auth.service';
 
 import ContextUnitOfWork from '../../../repositories/unitOfWork';
@@ -26,13 +27,13 @@ export const authRoutes = (service:AuthService):IRouter => {
             return res.sendStatus(400);
         }
 
-        const user = await service.signIn(req.body.email);
-        if(!user){
+        const objResult = await service.signIn(req.body.email);
+        if(!objResult.isValid()){
             return res.sendStatus(500);
         }
 
         const result:TokenValue = {
-            token: generateToken(user)
+            token: generateToken(objResult.data)
         };
 
         return res.status(201).json(result);
