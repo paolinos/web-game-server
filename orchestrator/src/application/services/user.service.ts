@@ -1,12 +1,12 @@
 import { createErrorEmptyResult, EmptyObjectResult, createSuccessEmptyResult } from "../objectResult";
 import { UserService } from "../interfaces/user.service.interface";
-import { UserRepository } from "../../repositories/user.repository";
+import { UserQueries } from "../../repositories/user.repository";
 import { User } from "../../domain/user";
 
 export class UserBusinessLogic implements UserService {
 
     constructor(
-		private readonly userRepository:UserRepository
+		private readonly userRepository:UserQueries
 	){}
 
 	async searchGame(id:string, email:string):Promise<EmptyObjectResult>  {
