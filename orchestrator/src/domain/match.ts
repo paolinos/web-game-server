@@ -1,36 +1,65 @@
 import { v4 as uuidv4 } from 'uuid';
 import { IdEntity } from './id.entity';
+import { UserConnectionStatus, UserMatch } from './user';
+
+export enum MatchStatus {
+    DEFAULT = "default",
+    WAITING_PLAYERS = "waiting-players",
+    WAITING_SOME_PLAYERS = "waiting-some-players",
+    PLAYING = "playing",
+    END = "end",
+}
+
+
 
 export interface MatchModel extends IdEntity {    
-    usersIds:string[];
-    createdAt:Date|null;
+    gameServerId:string;
+    gameServerHost:string;
+    status:MatchStatus;
+    users:UserMatch[];
+    createdAt:Date;
     endedAt:Date|null;
-
-    matchHost:string|null;
-    matchName:string|null;
 }
 
 export class Match implements MatchModel{
     public id: string;
-    public usersIds: string[];
-    public createdAt: Date|null;
-    public endedAt: Date|null;
-    public matchHost: string|null;
-    public matchName: string|null;
-    
+    public gameServerId:string = "";
+    public gameServerHost:string = "";
+    public status:MatchStatus = MatchStatus.DEFAULT;
+    public users:UserMatch[] = [];
+    public createdAt:Date;
+    public endedAt:Date|null = null;
 
     constructor(){
         this.id = uuidv4();
-        this.usersIds = [];
-        this.createdAt = null;
-
-        this.endedAt = null;
-        this.matchHost = null;
-        this.matchName = null;
+        this.createdAt = new Date();
     }
 
-
-    get isFree():boolean{
-        return this.usersIds.length === 0;
+    static newMatch(gameServerId:string, gameServerHost:string, users:{id:string, email:string}[]):Match{
+        const lobby = new Match();
+        lobby.gameServerId = gameServerId;
+        lobby.gameServerHost = gameServerHost;
+        lobby.users = users.map(q => ({
+            id: q.id,
+            email: q.email,
+            status: UserConnectionStatus.WAITING,
+            points: 0
+        }));
+        
+        return lobby;
     }
+}
+
+
+
+export interface UserGameInfo extends IdEntity{
+    email:string;
+    points:number;
+    status:UserGameStatus
+}
+
+export enum UserGameStatus {
+    WAITING = "waiting-for-user",
+    CONNECTED = "user-connected",
+    DISCONNECTED = "user-disconnected",
 }
