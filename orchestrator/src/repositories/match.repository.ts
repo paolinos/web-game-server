@@ -1,28 +1,19 @@
-import { Match } from "../domain/match";
-import { Repository, RepositoryQueries } from "./repository";
+import { Match } from '../domain/match';
+import { Repository, RepositoryQueries } from './repository';
 
 export interface MatchQueries extends RepositoryQueries<Match> {
-
-    /**
-     * 
-     * @param all 
-     */
-    getAll(all:boolean):Promise<Match[]>;
-
-    add(match:Match):Promise<void>;
+  add(match: Match): Promise<void>;
 }
 
-export class MatchRepository extends Repository<Match> implements MatchQueries{
-    
-    async getAll(all:boolean=false):Promise<Match[]>{
-        return this.data.filter(q => q.isFree);
-    }
+export class MatchRepository extends Repository<Match> implements MatchQueries {
+  async add(match: Match): Promise<void> {
+    this.data.push(match);
+  }
 
-    async add(match: Match): Promise<void> {
-        this.data.push(match);
-    }
-    
-    async save(entity: Match): Promise<void> {
-        // TODO: ?
-    }
+  /**
+   * Save does nothing with static.
+   */
+  async save(entity: Match): Promise<void> {
+    // TODO: ?
+  }
 }
