@@ -1,29 +1,48 @@
 import { IdEntity } from './id.entity';
 
-export interface UserInformation {
-    id:string;
-
-    email:string;
-
-    searchingAt:Date;
-
-    matchId:string|null;
+export enum UserStatus {
+    DEFAULT = "default",
+    SEARCHING_GAME = "searching-game",
+    CANCEL_SEARCHING_GAME = "cancel-searching-game",
+    ASSIGNED_TO_MATCH = "assigned-to-match",
+    PLAYING_MATCH = "playing-match",
+    END_MATCH = "end-match",
 }
 
-export class User implements IdEntity,UserInformation{
+export interface UserInformation {
+    id:string;
+    email:string;
+    status:UserStatus;
+    updatedAt:Date;
+}
 
-    public readonly searchingAt:Date;
-    public matchId:string|null;
+export class User implements IdEntity, UserInformation{
+
+    public status:UserStatus;
+    public updatedAt:Date;
 
     constructor(
         public readonly id:string, 
         public readonly email:string,
         ){
-        this.searchingAt = new Date();
-        this.matchId = null;
+        this.status = UserStatus.DEFAULT;
+        this.updatedAt = new Date();
     }
 
     get isAvailable():boolean{
-        return this.matchId === null;
+        return this.status === UserStatus.DEFAULT;
     }
+}
+
+export enum UserConnectionStatus {
+    WAITING = "waiting",
+    CONNECTED = "connected",
+    DISCONNECTED = "disconnected"
+}
+
+export interface UserMatch {
+    id:string;
+    email: string;
+    points:number;
+    status:UserConnectionStatus;
 }
