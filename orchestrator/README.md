@@ -1,9 +1,16 @@
 ## Description
+This is a GameManager that will be in charge of:
+- create/update match
+- set users to play the match
+- delete match
 
-We are using [Nest](https://github.com/nestjs/nest) framework.
+So we'll received **Events**
+- search-game => from API
+- match-ready => from Match
+And will send:
+- created-match => to API
 
-**Orchestrator** will be a Microservice that will listening for users and create the match and notify the users (sending event to api and api sending WS to client) the match to connect. 
-
+We're going to implement a pure RabbitMQ consumers/publishers
 
 ## Installation
 
