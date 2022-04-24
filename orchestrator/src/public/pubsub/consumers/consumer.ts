@@ -1,83 +1,129 @@
-import { RABBIT_HOST, RABBIT_PORT, RABBIT_QUEUE_APP, RABBIT_QUEUE_MATCH } from '../../../consts';
-import {RabbitMessage, RabbitMq} from '../rabbitmq';
+import { Channel, Connection } from 'amqplib';
+import {
+  RABBIT_DURABLE,
+  RABBIT_HOST,
+  RABBIT_PORT,
+  RABBIT_QUEUE_APP,
+  RABBIT_QUEUE_MATCH,
+  RABBIT_QUEUE_ORCHESTRATOR,
+} from '../../../consts';
+import { RabbitMessage, RabbitMq } from '../rabbitmq';
+
 
 interface BaseConsumer {
-    subscribeTo(name:string, func:Function):void;
+  subscribeTo(name: string, func: Function): void;
 
-    unsubscribeTo(name:string):void;
+  unsubscribeTo(name: string): void;
 
-    startToListen():void;
+  consumeFromQueue<T>(delegate: SubscriberDelegate<T>):Promise<void>;
 
-    startToListenAsync():Promise<void>;
+  consumeFromTopic(topic:string):Promise<void>;
 }
 
+
+
 interface SubscriberDelegate<T> {
-    (message: T): void;
+  (message: T): void;
 }
 
 abstract class Consumer implements BaseConsumer {
+  protected readonly _listeners: { [name: string]: Function } = {};
+  private readonly _queue: string;
+  
+  // @ts-ignore
+  protected conn: Connection; 
+  // @ts-ignore
+  protected channel: Channel;
+
+  constructor(queue: string) {
+    this._queue = queue;
+  }
+  
+
+  subscribeTo<T>(name: string, delegate: SubscriberDelegate<T>) {
+    this._listeners[name] = delegate;
+  }
+
+  unsubscribeTo(name: string) {
+    delete this._listeners[name];
+  }
+  private async init(){
+    if(!this.conn || !this.channel){
+      [this.conn, this.channel] = await RabbitMq.getConnAndChannel(
+        RABBIT_HOST,
+        RABBIT_PORT,
+      );
+    }
+  }
+
+  async consumeFromQueue<T>(delegate: SubscriberDelegate<T>): Promise<void> {
+    await this.init();
+
+    await this.channel.assertQueue(this._queue, { durable: RABBIT_DURABLE });
+    await this.channel.consume(this._queue, (msg:any) => {
+      try {
+        if(!msg) return this.channel.ack(msg);
+
+        const message = JSON.parse(msg.content.toString()) as T;
+        delegate(message);
+
+        this.channel.ack(msg);
+
+      } catch (error) {
+        console.error('Error consumeFromQueue:',this._queue,'with msg:',msg.content.toString());
+      }
+    });
+  }
+
+  private async onMessage(msg:any){
     
-    protected readonly _listeners: {[name: string]: Function } = {};
-    private readonly _queue:string;
+    try {
+      if(!msg) return this.channel.ack(msg);
+      
+      const messageStr = msg.content.toString();
+      const message = JSON.parse(messageStr) as RabbitMessage;
 
-    constructor(queue:string){
-        this._queue = queue;
+      const delegate = this._listeners[message.topic];
+      if (delegate) {
+        delegate(message);
+      }
+
+      this.channel.ack(msg); 
+    } catch (error) {
+      console.error('Error trying to listen :',this._queue,'with msg:',msg.content.toString());
     }
+  }
 
-    subscribeTo<T>(name: string, delegate: SubscriberDelegate<T>){
-        this._listeners[name] = delegate;
-    }
 
-    unsubscribeTo(name: string){
-        delete this._listeners[name];
-    }
 
-    startToListen(){
-        setTimeout(async() => {
-            await this.listen.bind(this);
-        }, 10);
-    }
+  async consumeFromTopic(topic:string){
+    await this.init();
+    
+    await this.channel.assertExchange(topic, 'topic', {durable: RABBIT_DURABLE});
+    const result = await this.channel.assertQueue('', {exclusive: true});
+    
+    // TODO: not sure..
+    const pattern:string = 'data';
 
-    async startToListenAsync():Promise<void>{
-        await this.listen();
-        await this.startToListenAsync();
-    }
-
-    private async listen(){
-        const [conn, channel] = await RabbitMq.getConnAndChannel(RABBIT_HOST, RABBIT_PORT);
-
-        await channel.assertQueue(this._queue, {durable: true});
-        await channel.consume(this._queue, async (msg) => {
-            if(msg){
-                try {
-                    const messageStr = msg.content.toString();
-                    const message = JSON.parse(messageStr) as RabbitMessage;
-                    
-                    const delegate = this._listeners[message.topic];
-                    if(delegate){
-                        delegate(message);
-                    }
-
-                    channel.ack(msg);
-                }
-                catch(err){
-                    console.error("Error trying to listen :", this._queue, "with msg:", msg.content.toString());
-                }
-            }
-
-            RabbitMq.close(conn, channel);
-        });
-    }
+    await this.channel.bindQueue(result.queue, topic, pattern);
+    await this.channel.consume(result.queue, this.onMessage.bind(this));
+  }
 }
 
-export class AppConsumer extends Consumer{
-    constructor(){
-        super(RABBIT_QUEUE_APP);
-    }
+export class AppConsumer extends Consumer {
+  constructor() {
+    super(RABBIT_QUEUE_APP);
+  }
 }
 
-export class MatchConsumer extends Consumer{
-    constructor(){
-        super(RABBIT_QUEUE_MATCH);
-    }
+export class OrchestratorConsumer extends Consumer {
+  constructor() {
+    super(RABBIT_QUEUE_ORCHESTRATOR);
+  }
+}
+
+export class MatchConsumer extends Consumer {
+  constructor() {
+    super(RABBIT_QUEUE_MATCH);
+  }
 }
