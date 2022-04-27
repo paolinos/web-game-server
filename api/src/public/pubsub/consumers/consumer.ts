@@ -1,45 +1,60 @@
-import { EventEmitter } from 'stream';
-import { RABBIT_QUEUE_MATCH, TOPIC_MATCH_INIT } from '../../../consts';
-import {RabbitMessage, RabbitMq} from '../rabbitmq';
+import { Delegate, Message, QueueConsumer, TopicConsumer } from '../pubsub';
+import { RABBIT_DURABLE, RABBIT_QUEUE_MATCH } from '../../../consts';
+import { RabbitMessageBroker } from '../rabbitmq';
 
-export class MatchConsumer extends EventEmitter{
 
+export class MatchConsumer extends RabbitMessageBroker implements QueueConsumer, TopicConsumer{
+    
     constructor(){
         super();
 
-        this.listen();
     }
+    
+    async consumeFromQueue<T extends Message>(delegate: Delegate<T>): Promise<void> {
+        await this.connect();
 
-    private listen(){
-        setTimeout(async() => {
-            await this.startListening.bind(this);
-        }, 10);
-    }
-
-    private async startListening(){
-        const [conn, channel] = await RabbitMq.getConnAndChannel();
-
-        await channel.assertQueue(RABBIT_QUEUE_MATCH, {durable: true});
-        await channel.consume(RABBIT_QUEUE_MATCH, async (msg) => {
-            if(msg){
-                try {
-                    const messageStr = msg.content.toString();
-                    const message = JSON.parse(messageStr) as RabbitMessage;
-                    if(message.topic === TOPIC_MATCH_INIT){
-                        this.emit(message.topic, message)
-                    }
-                    channel.ack(msg);
-                }
-                catch(err){
-                    console.error("Error trying to listen :", RABBIT_QUEUE_MATCH, "with msg:", msg.content.toString());
-                }
+        await this.channel.assertQueue(RABBIT_QUEUE_MATCH, { durable: RABBIT_DURABLE });
+        
+        await this.channel.consume(RABBIT_QUEUE_MATCH, (msg) => {
+            const value = this.onMessage(msg);
+            if(!value){
+                delegate(value as unknown as T);
             }
-
-            RabbitMq.close(conn, channel);
-
-            this.listen();
         });
     }
 
+    async consumeFromTopic<T extends Message>(topic: string, delegate: Delegate<T>): Promise<void> {
+        await this.connect();
 
+        await this.channel.assertExchange(topic, 'topic', {durable: RABBIT_DURABLE});
+        const result = await this.channel.assertQueue('', {exclusive: false});
+        
+        // TODO: not sure..
+        const pattern:string = 'data';
+    
+        await this.channel.bindQueue(result.queue, topic, pattern);
+        await this.channel.consume(result.queue, (msg) => {
+            const value = this.onMessage(msg);
+            if(!value){
+                delegate(value as unknown as T);
+            }
+        });
+    }
+
+    private onMessage<T extends Message>(msg:any):T|null{
+        try {
+            if(msg) {
+                const messageStr = msg.content.toString();
+                const message = JSON.parse(messageStr);           
+                this.channel.ack(msg);
+                return message;
+            }
+    
+        } catch (error) {
+          console.error('Error onMessage: with msg:',msg.content.toString(), error);
+        }
+
+        this.channel.ack(msg);
+        return null;
+    }
 }
