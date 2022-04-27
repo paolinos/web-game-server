@@ -6,7 +6,10 @@ import { GameServerService } from '../../../application/interfaces/game-server.s
 import { GameServerBusinessLogic } from '../../../application/services/game-server.service';
 
 import { TOPIC } from '../topics';
-import { AppConsumer, MatchConsumer, OrchestratorConsumer } from './consumer';
+import { 
+  BaseQueueConsumer,
+  TopicConsumerManager 
+} from './consumer';
 import ContextUnitOfWork from '../../../repositories/unitOfWork';
 import {
   addQueueToSearchUsersToMatch,
@@ -14,6 +17,7 @@ import {
   publishUsersAssingedMatch,
 } from '../publishers/publisher';
 import { GameType } from '../../../domain/game-server';
+import { RABBIT_QUEUE_ORCHESTRATOR } from '../../../consts';
 
 interface SearchGameMessage {
   id: string;
@@ -28,7 +32,8 @@ interface GameServerReadyMessage {
   totalPlayers: number;
 }
 
-const app = new AppConsumer();
+const topicConsumer = new TopicConsumerManager();
+
 const userService: UserService = new UserBusinessLogic(
   ContextUnitOfWork.UserRepository,
 );
@@ -41,7 +46,12 @@ const gameServerService: GameServerService = new GameServerBusinessLogic(
   ContextUnitOfWork.GameServerRepository,
 );
 
-app.subscribeTo(TOPIC.SEARCH_GAME, async (message: SearchGameMessage) => {
+
+
+
+topicConsumer.consumeFromTopic(TOPIC.SEARCH_GAME, async (data) => {
+
+  const message = JSON.parse(data.toString());
   console.log(`Message: ${TOPIC.SEARCH_GAME} data:`, message);
 
   // Add User
@@ -56,9 +66,9 @@ app.subscribeTo(TOPIC.SEARCH_GAME, async (message: SearchGameMessage) => {
   await addQueueToSearchUsersToMatch();
 });
 
-app.subscribeTo(
-  TOPIC.CANCEL_SEARCH_GAME,
-  async (message: SearchGameMessage) => {
+topicConsumer.consumeFromTopic(TOPIC.CANCEL_SEARCH_GAME, async (data) => {
+
+    const message = JSON.parse(data.toString());
     console.log(`Message: ${TOPIC.CANCEL_SEARCH_GAME} data:`, message);
 
     const result = await userService.cancelSearchGame(message.id);
@@ -70,14 +80,11 @@ app.subscribeTo(
     }
   },
 );
-app.consumeFromTopic(TOPIC.SEARCH_GAME);
-app.consumeFromTopic(TOPIC.CANCEL_SEARCH_GAME);
 
-const orchestratorConsumer = new OrchestratorConsumer();
-orchestratorConsumer.consumeFromQueue<{topic:string}>(async (data) => {
-  console.log("Orchestrator - consumeFromQueue:", data);
+const orchestratorConsumer = new BaseQueueConsumer(RABBIT_QUEUE_ORCHESTRATOR);
+orchestratorConsumer.consumeFromQueue(async (data) => {
+  console.log("Orchestrator - consumeFromQueue:", data.toString());
 
-  console.log(`Message: ${TOPIC.SEARCH_USERS_TO_MATCH}`);
   const matchResult = await matchService.createMatchIfPlayersAreReady();
   if (!matchResult.isValid()) {
     const errorMessage = 'Error trying to create Match';
@@ -111,14 +118,9 @@ orchestratorConsumer.consumeFromQueue<{topic:string}>(async (data) => {
 });
 
 
-const match = new MatchConsumer();
-match.subscribeTo(TOPIC.SEARCH_USERS_TO_MATCH, async () => {
+topicConsumer.consumeFromTopic( TOPIC.GAME_SERVER_READY, async (data) => {
   
-});
-
-match.subscribeTo(
-  TOPIC.GAME_SERVER_READY,
-  async (message: GameServerReadyMessage) => {
+    const message = JSON.parse(data.toString()) as GameServerReadyMessage;
     console.log(`Message: ${TOPIC.GAME_SERVER_READY} data:`, message);
 
     const result = await gameServerService.ready(
@@ -137,7 +139,5 @@ match.subscribeTo(
     }
   },
 );
-//match.consumeFromTopic(TOPIC.SEARCH_USERS_TO_MATCH);
-match.consumeFromTopic(TOPIC.GAME_SERVER_READY);
 
 console.log('Listening to pubsub message');

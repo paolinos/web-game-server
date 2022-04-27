@@ -25,3 +25,38 @@ export class RabbitMq{
 export interface RabbitMessage {
     topic:string,
 }
+
+export abstract class RabbitConn {
+    private _connection:Connection|null = null;
+
+    private readonly _host:string;
+    private readonly _port:number; 
+
+    constructor(host:string, port:number){
+        this._host = host;
+        this._port = port;
+    }
+
+    async getConn():Promise<Connection>{
+        if(!this._connection){
+            this._connection = await connect(`amqp://${this._host}:${this._port}`, "heartbeat=60");
+        }
+        return this._connection;
+    }
+
+    async getChannel():Promise<Channel>{
+        const conn = await this.getConn();
+        return conn.createChannel();
+    }
+
+    async closeChannel(channel:Channel):Promise<void>{
+        await channel.close();
+    }
+    async closeConn(channel:Channel|null):Promise<void>{
+        if(channel){
+            this.closeChannel(channel);
+        }
+        await this._connection?.close();
+    }
+
+}
