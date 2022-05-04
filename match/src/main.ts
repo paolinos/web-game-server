@@ -1,3 +1,4 @@
+/*
 import { NestFactory } from '@nestjs/core';
 
 import { RABBIT_QUEUE_MATCH } from './consts';
@@ -17,3 +18,7 @@ async function bootstrap() {
 	});
 }
 bootstrap();
+
+*/
+
+import './public';
