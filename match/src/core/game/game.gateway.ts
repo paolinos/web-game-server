@@ -1,3 +1,4 @@
+/*
 import {
     MessageBody,
     OnGatewayConnection,
@@ -45,9 +46,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
 	// Relation between socket and user
 	private readonly _clients:{ [key: string]: Socket };
-	/**
 	 * We didn't want to make the class EventEmitter. So we have the intenal EventEmitter.
-	 */
 	private readonly _eventEmitter:EventEmitter;
 
 	private authFunct:Function = null;
@@ -69,11 +68,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 		this._eventEmitter.off(eventName, listener);
 	}
 
-	/**
 	 * Emit event to parent class
 	 * @param client 
 	 * @param eventName 
-	 */
 	private emitEvent(client: Socket, eventName:WS_EVENTS, data:any=null):void {
 
 		// TODO:
@@ -81,10 +78,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 		this._eventEmitter.emit(eventName, new SocketEvent(eventName, client.id, client.handshake.auth.token, username, data));
 	}
 	
-	/**
-	 * 
+ 
 	 * @param users 
-	 */
 	public sendEventToUsers(event:string, users:User[], message:any=null):void
 	{
 		for (const user of users) {
@@ -99,11 +94,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 		}
 	}
 
-	/**
 	 * Client connected
 	 * @param client 
 	 * @param args 
-	 */
 	handleConnection(client: Socket, ...args: any[]) {
 		// TODO: delete this
 		//console.log("GameGateway - client", "headers:", client.handshake.headers, "query:", client.handshake.query, "token:", client.handshake.auth.token);
@@ -133,10 +126,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 		client.disconnect(true);
 	}
 
-	/**
 	 * client disconnected
 	 * @param client 
-	 */
 	handleDisconnect(client: Socket) {
 		// TODO: delete this
 		//console.log("User disconnected:", client.handshake.headers, "token:", client.handshake.auth.token);
@@ -162,12 +153,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 	@SubscribeMessage(WS_EVENTS.UPDATE)
 	updateGame(client: Socket) {
 		
-		/*
-		if(this.hasToken(client))
-		{
-			this.emitEvent(client, WS_EVENTS.UPDATE, client.data);
-		}
-		*/
+		
+		//if(this.hasToken(client))
+		//{
+		//	this.emitEvent(client, WS_EVENTS.UPDATE, client.data);
+		//}
+		
 
 		this.emitEvent(client, WS_EVENTS.UPDATE, client.data);
 	}
@@ -181,3 +172,4 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 		return client.handshake?.auth?.token;
 	}
 }
+*/
