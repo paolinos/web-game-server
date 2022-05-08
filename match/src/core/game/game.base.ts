@@ -1,3 +1,4 @@
+/*
 import { GameGateway, SocketEvent, WS_EVENTS } from './game.gateway';
 
 export abstract class GameBase {
@@ -25,3 +26,4 @@ export abstract class GameBase {
 
     abstract onEndGame(e:SocketEvent):void;
 }
+*/

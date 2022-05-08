@@ -1,3 +1,4 @@
+/*
 import { Controller } from '@nestjs/common';
 
 import { GameBase } from './game.base';
@@ -5,10 +6,9 @@ import { GameGateway, SocketEvent, WS_EVENTS } from './game.gateway';
 import { MatchRepository } from '../../repositories/match.repository';
 import { UserStatus } from '../../models/entities/user';
 import { UserMatchReadyDto } from '../../models/dto/user.dto';
-/**
+
  * This controller will run as Service
  * Just is a controller because of Nestjs configuratons.
- */
 
 const TIME_GAME:number = 10000;
 
@@ -24,11 +24,6 @@ export class GameController extends GameBase  {
         super(ws);
     }
 
-    /**
-     * Verify token and if user is allowed to this match
-     * @param {string } token 
-     * @returns {boolean}
-     */
     checkAuth(token:string):boolean{
         // TODO: check token
         return true;
@@ -86,3 +81,4 @@ export class GameController extends GameBase  {
         this._ws.server.emit("game-over");
     }
 }
+*/
