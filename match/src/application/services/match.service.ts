@@ -40,7 +40,7 @@ export class MatchBusinessLogic implements MatchService {
         await publishMatchReady({
             id: MATCH_ID,
             host: `ws://${hostname()}:${WS_PORT}`,
-            name: `${GAME_TYPE}, v1, 2 players`,
+            name: `${GAME_TYPE}, v1, 2 players`,    // settings of game
             type: GAME_TYPE,
             totalPlayers: GAME_PLAYERS
         });
@@ -72,10 +72,10 @@ export class MatchBusinessLogic implements MatchService {
 
 
     private onWSConnected () {
-        console.log("WebsocketConnEvent.CONNECTED");
+        console.log("onWSConnected - WebsocketConnEvent.CONNECTED");
     }
     private onWSMessage (data) {
-        console.log("WebsocketConnEvent.MESSAGE", data);
+        console.log("onWSMessage - WebsocketConnEvent.MESSAGE", data);
     }
 
 }

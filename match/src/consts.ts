@@ -7,6 +7,11 @@ export const WS_PORT = 8100;
 
 // JWT
 export const JWT_SECRET:string="jwt-secret";
+/**
+ * Expressed in minutes
+ * 288000 => 200 days
+ */
+ export const JWT_EXPIRATION:number=288000;
 
 export const RABBIT_QUEUE_APP:string="game-queue-app";
 export const RABBIT_QUEUE_MATCH:string="game-queue-match";

@@ -1,7 +1,8 @@
-import { createServer, Server } from 'http';   //from 'https' USE https
+import { createServer, IncomingMessage, Server } from 'http';   //from 'https' USE https
 import { WebSocket, WebSocketServer } from 'ws';
 import  * as EventEmitter from 'events';
 import { WS_PORT } from '../../consts';
+import { parseToken } from '../../tools/token.tools';
 
 const TOKEN_KEY = "Bearer,";
 
@@ -29,6 +30,15 @@ export enum WebsocketConnEvent {
     MESSAGE= "ws-client-message"
 }
 
+const checkUserAuthorization = (request:IncomingMessage) => {
+    const auth = request.rawHeaders.find(q => q.includes(TOKEN_KEY));
+    if(!auth) return null;
+
+    const tokenResult = getToken(auth);
+    if(tokenResult.err) return null;
+
+    return parseToken(tokenResult.token); 
+}
 
 
 export class WebsocketConn extends EventEmitter {
@@ -59,31 +69,19 @@ export class WebsocketConn extends EventEmitter {
             });
         }
 
-        
         this._server.on('upgrade', (request, socket, head) =>  {
-
             let disconnect = true;
 
             if(this._acceptConnection){
-
-                const auth = request.rawHeaders.find(q => q.includes(TOKEN_KEY));
-                if(auth){
-                    const tokenResult = getToken(auth);
-                    if(tokenResult.err){
-                        disconnect = true;
-                        console.warn("WS - Unauthorized user", tokenResult);
-                    }else{
-                        disconnect = false;
-                    }
-                }
+                const tokenData = checkUserAuthorization(request);
+                // TODO: validate if tokenData.email is user that need to connect
+                disconnect = tokenData === null;
             }
 
             if(disconnect){
                 socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
                 socket.destroy();
             }
-
-            
         });
     }
 
