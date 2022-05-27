@@ -1,9 +1,10 @@
 import { createServer, Server } from 'http';   //from 'https' USE https
 import { WebSocket, WebSocketServer } from 'ws';
 import  * as EventEmitter from 'events';
+import { WS_PORT } from '../../consts';
 
-const TOKEN_KEY = "Bearer, ";
-const PORT = 8100;
+const TOKEN_KEY = "Bearer,";
+
 
 const server = createServer()
 const wss = new WebSocketServer({ server });
@@ -36,6 +37,8 @@ export class WebsocketConn extends EventEmitter {
     private readonly _wss:WebSocketServer;
     private readonly _clients:{ [id: string]: WebSocket } = {};
 
+    private _acceptConnection:boolean = false;
+
     constructor(server:Server|null = null){
         super();
 
@@ -51,23 +54,43 @@ export class WebsocketConn extends EventEmitter {
 
         // TODO: better add an 'autoconnect' prop?
         if(runServer){
-            this._server.listen(PORT, () => {
-                console.log("Running at port:", PORT);
+            this._server.listen(WS_PORT, () => {
+                console.log("Running at port:", WS_PORT);
             });
         }
 
-        this._server.on('upgrade', function upgrade(request, socket, head) {
+        
+        this._server.on('upgrade', (request, socket, head) =>  {
 
-            const auth = request.rawHeaders.find(q => q.includes(TOKEN_KEY));
-            if(auth){
-                const tokenResult = getToken(auth);
-                if(tokenResult.err){
-                    socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-                    socket.destroy();
+            let disconnect = true;
+
+            if(this._acceptConnection){
+
+                const auth = request.rawHeaders.find(q => q.includes(TOKEN_KEY));
+                if(auth){
+                    const tokenResult = getToken(auth);
+                    if(tokenResult.err){
+                        disconnect = true;
+                        console.warn("WS - Unauthorized user", tokenResult);
+                    }else{
+                        disconnect = false;
+                    }
                 }
             }
+
+            if(disconnect){
+                socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+                socket.destroy();
+            }
+
+            
         });
     }
+
+    public acceptConnections(value:boolean):void {
+        this._acceptConnection = value;
+    }
+
 
     private setWebsocketServerListeners(){
         this._wss.on('connection', this.onWWSConnection.bind(this));

@@ -1,14 +1,8 @@
-import { WebsocketConn, WebsocketConnEvent } from './ws';
-import { MatchBusinessLogic, MatchService } from '../application/services/match.service'
+import './pubsub/consumers';
+import matchService from '../application/services/match.service'
 
-const socketServer = new WebsocketConn();
-socketServer.on(WebsocketConnEvent.CONNECTED, () => {
-    console.log("WebsocketConnEvent.CONNECTED");
-})
-socketServer.on(WebsocketConnEvent.MESSAGE, (data) => {
-    console.log("WebsocketConnEvent.MESSAGE", data);
-})
+const run = async () => {
+    matchService.ready();
+}
 
-
-const matchService:MatchService = new MatchBusinessLogic();
-matchService.ready();
+run();

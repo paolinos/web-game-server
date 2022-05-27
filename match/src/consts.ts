@@ -3,6 +3,8 @@ export const RABBIT_HOST:string="localhost";
 export const RABBIT_PORT:number=5672;
 export const RABBIT_DURABLE = false;
 
+export const WS_PORT = 8100;
+
 // JWT
 export const JWT_SECRET:string="jwt-secret";
 

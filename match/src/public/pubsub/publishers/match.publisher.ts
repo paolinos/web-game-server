@@ -19,4 +19,4 @@ export const publishMatchReady = async (
     };
   
     publishTopic(TOPIC.GAME_SERVER_READY, message);
-  };
+};
