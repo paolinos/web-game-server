@@ -2,7 +2,7 @@ import { createServer, IncomingMessage, Server } from 'http';   //from 'https' U
 import { WebSocket, WebSocketServer } from 'ws';
 import  * as EventEmitter from 'events';
 import { WS_PORT } from '../../consts';
-import { parseToken } from '../../tools/token.tools';
+import { parseToken, UserSession } from '../../tools/token.tools';
 
 const TOKEN_KEY = "Bearer,";
 
@@ -48,6 +48,8 @@ export class WebsocketConn extends EventEmitter {
     private readonly _clients:{ [id: string]: WebSocket } = {};
 
     private _acceptConnection:boolean = false;
+
+    private _clientSocket:Record<string, string> = {};
 
     constructor(server:Server|null = null){
         super();
@@ -96,9 +98,10 @@ export class WebsocketConn extends EventEmitter {
         this._wss.on('close', this.onWSSClose);
     }
 
-    private onWWSConnection(ws:WebSocket){
-        const tokenResult = getToken(ws.protocol);
-        this.addWebsocketClient(ws, tokenResult.token);
+    private onWWSConnection(ws:WebSocket, request:IncomingMessage){
+        
+        const tokenResult = checkUserAuthorization(request);
+        this.addWebsocketClient(ws, tokenResult);
     }
 
     private onWSSError(error){
@@ -110,12 +113,12 @@ export class WebsocketConn extends EventEmitter {
 
 
 
-    private addWebsocketClient(ws:WebSocket, token:string){
+    private addWebsocketClient(ws:WebSocket, user:UserSession){
         //
-        this._clients[token] = ws;
-        this.emit(WebsocketConnEvent.CONNECTED);
+        this._clients[user.email] = ws;
+        this.emit(WebsocketConnEvent.CONNECTED, user);
         ws.on('message', (data) => {
-            this.emit(WebsocketConnEvent.MESSAGE, data.toString());
+            this.emit(WebsocketConnEvent.MESSAGE, user.email, data.toString());
         });
 
         ws.on("close", () => {
