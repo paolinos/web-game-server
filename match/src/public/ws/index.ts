@@ -48,6 +48,8 @@ export interface IWebsocketConn {
 
     sendMessageToAll(value:any):void;
 
+    disconnectClients():void;
+
     // from EventEmitter
     on(eventName: string | symbol, listener: (...args: any[]) => void):this;
 }
@@ -109,13 +111,22 @@ export class WebsocketConn extends EventEmitter implements IWebsocketConn {
             return;
         }
 
-        ws.send(value);
+        ws.send(JSON.stringify(value));
     }
 
     public sendMessageToAll(value: any): void {
         for (const userEmail in this._clients) {
             const ws = this._clients[userEmail];
-            ws.send(value);
+            ws.send(JSON.stringify(value));
+        }
+    }
+
+    public disconnectClients():void {
+        for (const userEmail in this._clients) {
+            const ws = this._clients[userEmail];
+            ws.close();
+
+            delete this._clients[userEmail];
         }
     }
 
