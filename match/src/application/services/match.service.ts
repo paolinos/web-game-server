@@ -1,11 +1,12 @@
-import { GAME_PLAYERS, GAME_TYPE, MatchStatus, MATCH_ID, WS_PORT } from "../../consts";
-import { publishMatchReady } from "../../public/pubsub/publishers/match.publisher";
+import { GAME_PLAYERS, GAME_TYPE, MatchStatus, MATCH_ID, MATCH_TIME_SECONDS, WS_PORT } from "../../consts";
+import { publishMatchEnd, publishMatchReady } from "../../public/pubsub/publishers/match.publisher";
 import { hostname } from 'os';
 import { GameServerAssignedMatchMessage } from "src/public/pubsub/consumers";
-import { WebsocketConn, WebsocketConnEvent } from "../../public/ws";
+import { IWebsocketConn, WebsocketConn, WebsocketConnEvent } from "../../public/ws";
 import { UserSession } from "../../tools/token.tools";
 import { publishTopic } from "../../public/pubsub/publishers/publisher";
 import { TOPIC } from "../../public/pubsub/topics";
+import Timer, { TimerId } from '../../tools/timer';
 
 
 enum UserStatus {
@@ -41,14 +42,17 @@ export interface MatchService {
     error():Promise<void>
 }
 
+
 export class MatchBusinessLogic implements MatchService {
     
     private _users:UserMatchDto[] = [];
-    private _ws:WebsocketConn;
+    private _ws:IWebsocketConn;
 
     private _matchStats:MatchStatus;
 
     private _statLogs:{status:MatchStatus, userStatus:any[], at:Date }[] = [];
+
+    private _timer:TimerId;
 
     constructor(
     ) {
@@ -101,12 +105,15 @@ export class MatchBusinessLogic implements MatchService {
     }
 
     async runGame(): Promise<void> {
+        // TODO:
         throw new Error("Method not implemented.");
     }
     end(): Promise<void> {
+        // TODO:
         throw new Error("Method not implemented.");
     }
     error(): Promise<void> {
+        // TODO:
         throw new Error("Method not implemented.");
     }
 
@@ -131,12 +138,16 @@ export class MatchBusinessLogic implements MatchService {
         if(connectedUsers.length === GAME_PLAYERS){
             this.updateStatus(MatchStatus.PLAYING);
 
-            // start game
+            // TODO: NOT USE publishTopic! 
             await publishTopic(TOPIC.MATCH_INIT, {matchId: MATCH_ID});
+
+            // Start time:
+            this._timer = Timer.runTimer(MATCH_TIME_SECONDS, this.onMatchTimeout.bind(this));
+
         }
     }
 
-    private onWSMessage (userSession:UserSession, data:string) {
+    private async onWSMessage (userSession:UserSession, data:string) {
         
         if(this._matchStats !== MatchStatus.PLAYING){
             console.warn(`onWSMessage - WebsocketConnEvent.MESSAGE - NOT ALLOWED, match status: ${this._matchStats}`, data);
@@ -148,10 +159,88 @@ export class MatchBusinessLogic implements MatchService {
         user.stats.message_response = user.stats.last_message ? now.getTime() - user.stats.last_message.getTime() : 0;
         user.stats.last_message = now;
 
-        // TODO: parse message logic (game if is able)
-        // TODO: check uses movement, send update to others.
+        await this.gameUpdate(user, data);
     }
 
+
+    private async gameUpdate(currentUser:UserMatchDto, data:string):Promise<void> {
+        // TODO: parse message logic (game if is able)
+        // TODO: check uses movement, send update to others.
+
+        // Update other users:
+        // TODO: create an interface for message.
+        const message = {
+            status: "update",
+            users: [
+                {
+                    id: currentUser.id,
+                    data: data
+                }
+            ]
+        };
+        this._ws.sendMessageToOthers(currentUser.email, message);
+    }
+
+    private async onEndGame(timeout:boolean):Promise<void> {
+        let message:any;
+
+        // TODO: refactor
+        let endGameStatus:string;
+        if(timeout){
+            endGameStatus = 'time out';
+            message = {
+                status: "end-game",
+                type: endGameStatus,
+                users: [
+                    // TODO:
+                ]
+            };
+        }else {
+            endGameStatus = 'player-win'
+            message = {
+                status: "end-game",
+                type: endGameStatus,
+                users: [
+                    // TODO:
+                ]
+            };
+        }
+
+        this._ws.sendMessageToAll(message);
+
+        this.updateStatus(MatchStatus.END_GAME);
+
+        const biggestScore = this._users.sort((a,b) => b.points - a.points)[0].points;
+        const playersWins = this._users.filter(q => q.points === biggestScore).map(q => q.id);
+
+        await publishMatchEnd({
+            id: MATCH_ID,
+            type: GAME_TYPE,
+            players: this._users.map(q => ({id: q.id, email: q.email, points: q.points})),
+            status: endGameStatus,
+            playersWins,
+            typeOfEnd: playersWins.length === 1 ? 'player-win' : 'draw'
+        });
+
+        // Disconnect
+        let timeOutId = setTimeout(async() => {
+            clearTimeout(timeOutId);
+
+            // disconnect clients
+            this._ws.disconnectClients();
+
+            this._users = [];
+
+        }, 1000);
+
+    }
+
+
+    private async onMatchTimeout() {
+        Timer.delete(this._timer);
+
+        await this.onEndGame(true);
+    }
 }
 
 export default new MatchBusinessLogic();
