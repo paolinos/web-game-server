@@ -20,6 +20,9 @@ export const GAME_TYPE:string = "PONG";
 export const GAME_PLAYERS:number = 2;
 export const MATCH_ID:string = `MATCH-${Math.round(Math.random() * 1000000)}`;
 
+// 5sg
+export const MATCH_TIME_SECONDS:number = 5000;
+
 export enum MatchStatus{
     STAND_BY = 0,
     WAITING_PLAYERS = 1,
