@@ -41,7 +41,18 @@ const checkUserAuthorization = (request:IncomingMessage) => {
 }
 
 
-export class WebsocketConn extends EventEmitter {
+export interface IWebsocketConn {
+    acceptConnections(value:boolean):void;
+
+    sendMessageToOthers(currentUserEmail:string, value:any):void;
+
+    sendMessageToAll(value:any):void;
+
+    // from EventEmitter
+    on(eventName: string | symbol, listener: (...args: any[]) => void):this;
+}
+
+export class WebsocketConn extends EventEmitter implements IWebsocketConn {
     
     private readonly _server:Server;
     private readonly _wss:WebSocketServer;
@@ -89,6 +100,23 @@ export class WebsocketConn extends EventEmitter {
 
     public acceptConnections(value:boolean):void {
         this._acceptConnection = value;
+    }
+
+    public sendMessageToOthers(currentUserEmail: string, value: any): void {
+        const ws = this._clients[currentUserEmail];
+        if(!ws){
+            console.warn('User not exist in the connection. wrong Email');
+            return;
+        }
+
+        ws.send(value);
+    }
+
+    public sendMessageToAll(value: any): void {
+        for (const userEmail in this._clients) {
+            const ws = this._clients[userEmail];
+            ws.send(value);
+        }
     }
 
 
