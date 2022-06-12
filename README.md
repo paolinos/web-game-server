@@ -24,8 +24,8 @@ That is the server part, but also we'll have games (UI), to start this demo I'll
 **ONLY FOR DEVELOPMENT**
 ```bash
 
-# Create RabbitMQ container
-docker container run -d --rm --net=host --name rabbit.dev rabbitmq:3
+# Create RabbitMQ container - one time (rm)
+    docker container run -d --rm --net=host --name rabbit.dev rabbitmq:3
 
 docker container run -d --net=host --name rabbit.dev rabbitmq:3
 
