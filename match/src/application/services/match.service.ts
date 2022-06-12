@@ -54,7 +54,7 @@ export class MatchBusinessLogic implements MatchService {
     ) {
         this._ws = new WebsocketConn();
         this._ws.on(WebsocketConnEvent.CONNECTED, this.onWSConnected.bind(this));
-        this._ws.on(WebsocketConnEvent.MESSAGE, this.onWSMessage);
+        this._ws.on(WebsocketConnEvent.MESSAGE, this.onWSMessage.bind(this));
 
         this.updateStatus(MatchStatus.STAND_BY);
     }
@@ -129,11 +129,10 @@ export class MatchBusinessLogic implements MatchService {
 
         const connectedUsers = this._users.filter(q => q.status === UserStatus.CONNECTED);
         if(connectedUsers.length === GAME_PLAYERS){
+            this.updateStatus(MatchStatus.PLAYING);
+
             // start game
             await publishTopic(TOPIC.MATCH_INIT, {matchId: MATCH_ID});
-
-            //  
-            this.updateStatus(MatchStatus.PLAYING);
         }
     }
 
@@ -144,9 +143,7 @@ export class MatchBusinessLogic implements MatchService {
             return;
         }
 
-        console.log("onWSMessage - WebsocketConnEvent.MESSAGE", data);
         const user = this._users.find(q => q.email === userSession.email);
-
         const now = new Date();
         user.stats.message_response = user.stats.last_message ? now.getTime() - user.stats.last_message.getTime() : 0;
         user.stats.last_message = now;

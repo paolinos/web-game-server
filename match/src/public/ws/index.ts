@@ -105,26 +105,29 @@ export class WebsocketConn extends EventEmitter {
     }
 
     private onWSSError(error){
+        // TODO:
         console.log("error", error);
     }
     private onWSSClose(){
+        // TODO:
         console.log("Close");
     }
 
 
 
     private addWebsocketClient(ws:WebSocket, user:UserSession){
-        //
         this._clients[user.email] = ws;
         this.emit(WebsocketConnEvent.CONNECTED, user);
         ws.on('message', (data) => {
-            this.emit(WebsocketConnEvent.MESSAGE, user.email, data.toString());
+            this.emit(WebsocketConnEvent.MESSAGE, user, data.toString());
         });
 
         ws.on("close", () => {
+            // TODO:
             console.log("Close");
         })
         ws.on("error", (error) => {
+            // TODO:
             console.log("error", error);
         })
     }
