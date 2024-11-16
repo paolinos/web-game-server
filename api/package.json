@@ -7,8 +7,6 @@
   "scripts": {
     "dev": "npx @biomejs/biome format --write ./src && ts-node ./src/main.ts",
     "build": "tsc -p .",
-    "start": "ts-node ./src/main.ts",
-    "start:prod": "node dist/src/main.js",
     "test": "APP_ENV=test jest ./test/unittest",
     "test:e2e": "APP_ENV=test jest ./test/e2e"
   },

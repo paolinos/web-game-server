@@ -1,35 +1,27 @@
-## Description
+## Web
 
-We are using [Nest](https://github.com/nestjs/nest) framework.
+Basic web app, that will contain a base web alication with websocket + an api.
+We're using:
+- Typescript (and building with SWC)
+- ExpressJS (Web Framework)
+- Inversify (Inversion Of Controll)
+- Test Jest & SWC
+- Biome as Linter
 
-## Installation
+**Scripts:**
 
-```bash
+```sh
+#---------- Install
 $ npm install
-```
 
-## Running the app
-
-```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
-```
-
-## Test
-
-```bash
-# unit tests
+#---------- Test
+# Run Unit tests
 $ npm run test
 
-# e2e tests
+# Run e2e tests
 $ npm run test:e2e
 
-# test coverage
-$ npm run test:cov
+
+#---------- Run
+$ npm run dev
 ```
