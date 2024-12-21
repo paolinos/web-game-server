@@ -3,4 +3,5 @@ export type UserModel = {
 	password: string;
 	lastAccess: Date;
 	token?: string;
+	socketId?: string;
 };

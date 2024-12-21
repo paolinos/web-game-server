@@ -1,28 +1,28 @@
 import "reflect-metadata";
 import { UserModel } from "../../../../src/domain/models/user.model";
-import { IUserRepository } from "../../../../src/infrastructure/db/user.repository";
+import { IUserRepository, UserEntity } from "../../../../src/infrastructure/db/user.repository";
 
 class UserRepositoryMock implements IUserRepository {
-    getByEmail(_email: string): Promise<UserModel | undefined> {
+    async getByEmail(_email: string): Promise<UserEntity | undefined> {
         throw new Error("Method not implemented.");
     }
-    addUser(_email: string, _password: string, _token?: string): Promise<UserModel> {
+    async addUser(_email: string, _password: string, _token?: string): Promise<UserEntity> {
         throw new Error("Method not implemented.");
     }
-    updateUser(_user: UserModel): Promise<void> {
+    async updateUser(_user: UserEntity): Promise<void> {
         throw new Error("Method not implemented.");
     }
-    deleteUser(_email: string): Promise<void> {
+    async deleteUser(_email: string): Promise<void> {
         throw new Error("Method not implemented.");
     }
 
 }
-export const userRepositoryMock = new UserRepositoryMock();
+export const userRepositoryMock:IUserRepository = new UserRepositoryMock();
 
 export const getByEmailSpy = () => {
     return jest.spyOn(userRepositoryMock, "getByEmail");
 }
-export const getByEmailMock = (dto?:UserModel) => {
+export const getByEmailMock = (dto?:UserEntity) => {
     const spy = getByEmailSpy();
     spy.mockImplementation((email:string) => { 
         if(dto){
@@ -51,7 +51,7 @@ export const updateUserSpy = () => {
 }
 export const updateUserMock = (userEmail:string) => {
     const spy = updateUserSpy();
-    spy.mockImplementation((user:UserModel) => { 
+    spy.mockImplementation((user:UserEntity) => { 
         if(user.email !== userEmail || !user.token) throw new Error("User is invalid or missing token");
         return Promise.resolve();
     });

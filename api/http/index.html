@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web</title>
+</head>
+<body>
+    <div>
+        <button id="btnConn">Connect</button> | 
+        Status:<label id="lblMsg"></label>
+        <hr/>
+        Games:
+        <select id="listGame" disabled>
+            <option>disabled</option>
+        </select> |
+        <button id="btnSearch" disabled>Search Game</button>
+    </div>
+    <div>
+
+    </div>
+
+    
+    <script>
+        const SERVER_HOST = "localhost:8000"
+        class ApiService {
+            
+            #_ws;
+            constructor(){
+
+            }
+
+            /**
+             * 
+             * @param {string} email
+             * @param {password} email
+             * @param {Promise<{error, body}>}
+            */
+            async auth(email, password){
+                const result = {error:null, body:null}
+                try {
+                    const response = await fetch(`http://${SERVER_HOST}/auth`, {
+                        method: "POST",
+                        body: JSON.stringify({ email, password }),
+                        headers:{
+                            "Content-Type":"application/json;charset=UTF-8"
+                        }
+                    });
+
+                    if(response.status != 201) {
+                        result.error = `Error to auth status:${response.status}`;
+                    }else {
+                        result.body = await response.json();
+                    }
+                    
+                } catch (error) {
+                    result.error = `Error trying to connect user. ${error.message}`;
+                }
+                return result;
+            }
+
+            async ws(token) {
+                this.#_ws = new WebSocket(
+                    `${SERVER_HOST}/ws`,
+                    "protocolOne",
+                );
+
+                this.#_ws.on("connect", () => {
+                    this.#_ws.send("token", token);
+                })
+            }
+        }
+        
+        let socket;
+        const wsConnect = (auth, onMessage) => {
+            socket = new WebSocket(`http://${SERVER_HOST}/ws`);
+            // Connection opened
+            socket.addEventListener("open", (event) => {
+                //socket.send("Hello Server!");
+                socket.send(`auth|${auth}`);
+            });
+
+            // Listen for messages
+            socket.addEventListener("message", onMessage);
+
+            socket.addEventListener("close", (ev) => {
+                // TODO: Reset all
+                //socket = null;
+                //fillOptions(listGame,[])
+                //lblMsg.innerText = "";
+                resetUI();
+            });
+        }
+
+        const api = new ApiService();
+        const btnConn = document.getElementById("btnConn");
+        const lblMsg = document.getElementById("lblMsg");
+
+        const listGame = document.getElementById("listGame");
+        const btnSearch = document.getElementById("btnSearch");
+
+        const resetUI = () => {
+            socket = null;
+            btnConn.disabled = false;
+            lblMsg.innerText="";
+            listGame.innerHTML="";
+            btnSearch.disabled = true;
+        }
+
+        const fillOptions = (element, list) => {
+            element.innerHTML = "";
+
+            for (const name of list) {
+                var option = document.createElement("option");
+                option.text = name;
+                option.value = name;
+                element.appendChild(option);    
+            }
+            
+            element.disabled = list.length === 0;
+            btnSearch.disabled = list.length === 0;
+        }
+        
+        btnConn.addEventListener("click", async () => {
+            lblMsg.innerText = "";
+            const result = await api.auth("test@mail.com", "pass");
+            if(result.error){
+                lblMsg.innerText = result.error;
+            }else{
+                lblMsg.innerText = "User connected"
+            }
+            
+            wsConnect(result.body.token, (event)=> {
+                console.log("Message from server ", event.data);
+                const keyValue = event.data.split("|");
+                if(keyValue[0] === "games:available"){
+                    console.log(keyValue[1].split(";"));
+                    fillOptions(listGame, keyValue[1].split(";"));
+                }
+            });
+        });
+
+        btnSearch.addEventListener("click", () => {
+            console.log("search:", listGame.value);
+            socket.send(`search:match|${listGame.value}`); 
+        })
+    </script>
+</body>
+</html>

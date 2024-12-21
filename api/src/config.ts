@@ -31,7 +31,7 @@ class Config implements IConfig {
 		this._app_version = process.env.APP_VERSION || "v0.0.0";
 		this._restapi_port = parseInt(process.env.REST_API_PORT || "8000");
 
-		this._nats_host = process.env.NATS_HOST || "localhost:4442";
+		this._nats_host = process.env.NATS_HOST || "nats.dev:4222";
 
 		this._jwt_secret = process.env.JWT_SECRET || "jwt-secret-fake";
 	}

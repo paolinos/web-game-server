@@ -1,10 +1,11 @@
+import "reflect-metadata";
 import { 
     addUserMock, 
     addUserSpy, 
     getByEmailMock, 
     updateUserMock, 
     userRepositoryMock 
-} from "../../mock/repository/user.repository.mock";
+} from "../../mock/repository/user.repo.mock";
 import { AuthBusiness } from "../../../../src/core/business/auth.business";
 import { UserModel } from "../../../../src/domain/models/user.model";
 import { verifyToken } from "../../../../src/common/token";
