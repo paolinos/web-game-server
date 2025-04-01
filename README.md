@@ -1,55 +1,63 @@
-### Web Game Server
-Web game server is a prof of concept of simple server for game.\
-Se we create different services that for each part.\
-Services:
-- api: Rest API,for sigin, search/cancel search game, and get points. 
-- orchestrator: PubSub that will received user to find a match, create the match and let it's play. Also will connect with the game-servers
-- match: The match or game server, that will allow users to play the game.
+# Web Game Server
 
-**NOTE:** match will be renamed as game-server, to differenciate that\
-- `game-server` is the server running. and be able to host multiples matchs (one match at time) 
-- `match` match is the instance of a game, that will run in a game-server with a list of players and will have and start & end.
+## Getting started
+WebGameServer requires Go version 1.23 or above.
+Libraries:
+- Gin: Web framework 
+- Gorilla: WebSocket
+- Nats: Key/Value storage, PubSub/Queue
 
-That is the server part, but also we'll have games (UI), to start this demo I'll added a simple pong game, to play 2 players.
+### Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    actor device
+    participant Api
+    participant GameServer
+    participant Nats
+
+    device -)+ Api: POST /signin {email:string passsword: string }
+    Api-) Nats: check DB and generate token
+    Api--)- device: { token: string }
+
+    device -)+ Api: GET /dashboard with token
+    Api-) Nats: check token
+    Api-) Nats: get user information
+    Api--)- device: return user information (points, played games, etc)
+
+    device ->>+ Api: GET /sse (server-sent events)
+    device -)+ Api: POST /search-match
+    Api-) Nats: Storage fata into DB
+    Api--)- device: after have all user return match information
+    Api-) Nats: Notify GameServer about Match information and users
+    Api--)- device: disconnect WS
 
 
-### Messages
-![Messages Workflow](/documents/messages-workflow.jpg)
+    device ->>+ GameServer: GET /ws Connect to Websocket
+    GameServer --) device: All users connected
+    GameServer --) device: start game
+    loop Game Loop. Every X s/ms
+        device-->GameServer: device send update, and also recieve other device update
+    end
+    GameServer --) device: End Game Or time out or one of the player won
+    GameServer --) Nats: Notify Api with the result of the match
+    GameServer ->>- device: disconnect
 
-
-
-
-#### Docker scripts
-
-**ONLY FOR DEVELOPMENT**
-```bash
-
-# Create RabbitMQ container - one time (rm)
-    docker container run -d --rm --net=host --name rabbit.dev rabbitmq:3
-
-docker container run -d --net=host --name rabbit.dev rabbitmq:3
-
-# Create NodeDev container - Powershell
-docker container run -it --net=host  -w /apps -v ${PWD}:/apps --name web-game-server.dev node:current-alpine sh
-# Create NodeDev container - Linux
-docker container run -it --net=host  -w /apps -v $(pwd):/apps --name web-game-server.dev node:current-alpine sh
 ```
-Docker commands:
-```bash
-# Start container 
-docker container start {container-name}
-#       Ex.:    docker container start rabbit.dev
-#       Ex.:    docker container start web-game-server.dev
-
-# Get inside container:
-docker container exec -it {container-name} {command}
-#       Ex.:    docker container exec -it web-game-server.dev sh
-```
 
 
-### Commits
-I'll use hashtag to identify all commit for each project 
-- #api
-- #orchestrator
-- #match            - Match/Game Server
-- #game             - frontend that will connect with API & Match/GameServer
+### TODO:
+<style>
+r { color: Red }
+o { color: Orange }
+g { color: Green }
+</style>
+
+- working in [Common](./common/)
+    - <g>DONE:</g> Common with Server Sent Event Example
+    - <o>TODO:</o> Common with Websocket example
+    - <r>TODO:</r> Common with Nats example (Queue, Pubsub, Key/Value)
+    - <r>TODO:</r> Start with API in Golang
+    - <r>TODO:</r> Start with GameServer in Golang
+    - <r>TODO:</r> Create basic TicTacToe game puse js
+    
