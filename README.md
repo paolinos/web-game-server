@@ -54,10 +54,10 @@ g { color: Green }
 </style>
 
 - working in [Common](./common/)
-    - <g>DONE:</g> Common with Server Sent Event Example
-    - <o>TODO:</o> Common with Websocket example
-    - <r>TODO:</r> Common with Nats example (Queue, Pubsub, Key/Value)
-    - <r>TODO:</r> Start with API in Golang
-    - <r>TODO:</r> Start with GameServer in Golang
-    - <r>TODO:</r> Create basic TicTacToe game puse js
-    
+    - <o>[x] Progress:</o> Common with Server Sent Event Example
+    - <o>[ ] TODO:</o> Common with Websocket example
+    - <r>[ ] TODO:</r> Common with Nats example (Queue, Pubsub, Key/Value)
+    - <r>[ ] TODO:</r> Start with API in Golang
+    - <r>[ ] TODO:</r> Start with GameServer in Golang
+    - <r>[ ] TODO:</r> Create basic TicTacToe game puse js
+
