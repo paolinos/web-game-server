@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web</title>
+    <link rel="stylesheet" href="./static/styles.css">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body>
+    <div id="loginSection" class="section">
+        <div>
+            <input id="txtEmail" type="text" placeholder="email@domain.com" /> | <input id="txtUsername" type="text" placeholder="Username" /> | <button id="btnSignin">Signin</button>
+        </div>
+    </div>
+    <div id="homeSection" class="section section_inactive">
+        <h4>Dashboard</h4>
+        <div>Username:<lable id="lblHomeUsername"></lable> | Total Points:<lable id="lblHomePoints"></lable></div>
+        <div>Search for match: <button id="btnHomeMatch">Search</button></div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Game</th>
+                    <th>Ponts</th>
+                    <th>Played</th>
+                </tr>
+            </thead>
+            <tbody id="dashboardBody"></tbody>
+        </table>
+        
+    </div>
+    <div id="gameSection" class="section section_inactive">
+        Game
+    </div>
+
+    <script>
+        const SERVER_HOST = "http://localhost:8000/api"
+        let api_token = undefined;
+        /**
+         * Call API
+         * @param {string} path
+         * @param {string} method
+         * @param {Object|undefined} body
+         * @returns {Object}
+        */
+        const callApi = async (path, method, body=undefined) => {
+            const headers = {
+                "Content-Type": "application/json"
+            }
+            if(api_token) {
+                headers["Authorization"] = api_token;
+            }
+            const response = await fetch(`${SERVER_HOST}/${path}`, {
+                method,
+                headers,
+                body: body ? JSON.stringify(body) : undefined
+            });
+
+            const bodyResult = await response.json();
+            if (response.status < 200 || response.status >= 400) {
+                const err = `Error trying to call ${path}.${bodyResult.error||""}`;
+                console.error(err);
+                throw new Error(err);
+            }
+            return bodyResult;
+        }
+
+        const LOGIN_VIEW = "loginSection";
+        const HOME_VIEW = "homeSection";
+        const GAME_VIEW = "gameSection";
+        
+        const ViewManager = (() => {
+            let _views = {};
+            let _activeView = undefined;
+
+            return {
+                setView: (key, initCallback) => {
+                    const element = document.getElementById(key)
+                    _views[key] = {
+                        element: element,
+                        cb: initCallback
+                    };
+                    element.style.display = "none"
+                },
+                loadView: (key) => {
+                    const view = _views[key];
+                    if(view){
+                        if(_activeView){
+                            _activeView.element.style.display = "none"
+                            _activeView = undefined;
+                        }
+                        if(view.cb){
+                            view.cb();
+                        }
+                        view.element.style.display = "block"
+                        _activeView = view;
+                    }
+                }
+            }
+        })();
+    </script>
+
+    <script>
+        //----------------------------------------------------
+        //                                      Signin View
+        const txtEmail = document.getElementById("txtEmail")
+        const txtUsername = document.getElementById("txtUsername")
+        const btnSignin = document.getElementById("btnSignin")
+        btnSignin.addEventListener("click", async () => {
+            if(txtEmail.value.length === 0 || txtUsername.value.length === 0 ){
+                console.log("Email or Username are required");
+                return;
+            }
+
+            const {token} = await callApi("signin", "POST", {email: txtEmail.value, username: txtUsername.value})
+            api_token = token;
+            ViewManager.loadView(HOME_VIEW);
+        })
+    </script>
+
+    <script>
+        //----------------------------------------------------
+        //                                      Home View
+        const dashboardBody = document.getElementById("dashboardBody");
+        const lblHomeUsername = document.getElementById("lblHomeUsername");
+        const lblHomePoints = document.getElementById("lblHomePoints");
+        const btnHomeMatch = document.getElementById("btnHomeMatch");
+        
+        const loadDashboad = async () => {
+            
+            const data = await callApi("dashboard", "GET");
+            lblHomeUsername.innerText = data.username;
+            lblHomePoints.innerText = data.points;
+
+            for (const match of data.matches) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${match.game}</td><td>${match.points}</td><td>${match.playedAt} (// TODO: misisng to convert)</td>`;
+                dashboardBody.appendChild(tr);
+            }
+        }
+
+        btnHomeMatch.addEventListener("click", async () => {
+            //! TODO: if we want a token we need to ask fist and then call
+            const evtSource = new EventSource(`${SERVER_HOST}/match-notification?tmp=${txtEmail.value}`);
+            evtSource.addEventListener("notice", (e) => {
+                //! TO DELETE
+                console.log("SSE notice:", e); 
+            });
+            evtSource.addEventListener("update", (e) => {
+                //! TO DELETE
+                console.log("SSE update:", e);
+            });
+
+            evtSource.addEventListener("message", (e) => {
+                console.log("SSE Message:", e, "now:", Date.now())
+                evtSource.close()
+            });
+            evtSource.onerror = (err) => {
+                console.error("SSE failed:", err);
+                evtSource.close()
+            };
+
+            const data = await callApi("search-match", "POST", {game: "TIC-TAC-TOE"});
+        })
+    </script>
+
+    <script>
+        ViewManager.setView(LOGIN_VIEW);
+        ViewManager.setView(HOME_VIEW, () => {
+            console.log("Init Home");
+
+            loadDashboad().then(e => console.log)
+        });
+        ViewManager.setView(GAME_VIEW, () => {
+            
+        });
+        ViewManager.loadView(LOGIN_VIEW);
+    </script>
+</body>
+</html>
