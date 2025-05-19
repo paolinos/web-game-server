@@ -2,7 +2,8 @@ package internal
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
+	"net/http"
 	"slices"
 	"time"
 
@@ -21,7 +22,7 @@ func authMiddleware() gin.HandlerFunc {
 
 		token := c.Request.Header.Get("Authorization")
 		if token == "" {
-			c.JSON(401, gin.H{
+			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "Unauthorized",
 			})
 			c.Abort()
@@ -30,7 +31,7 @@ func authMiddleware() gin.HandlerFunc {
 
 		pos := slices.IndexFunc(users, func(c *fakeUserData) bool { return c.token == token })
 		if pos == -1 {
-			c.JSON(401, gin.H{
+			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "Middleware - Unauthorized. Invalid token",
 			})
 			c.Abort()
@@ -57,7 +58,7 @@ func sseMiddleware() gin.HandlerFunc {
 		// TODO: we're using 'tmp' as email and not one usage token. This is not secure, so be aware of this.
 		pos := slices.IndexFunc(users, func(c *fakeUserData) bool { return c.email == tmp })
 		if pos == -1 {
-			c.JSON(401, gin.H{
+			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "Middleware - Unauthorized. Invalid token",
 			})
 			c.Abort()
@@ -70,7 +71,6 @@ func sseMiddleware() gin.HandlerFunc {
 			message: make(chan string),
 			destroy: false,
 		}
-		log.Printf("SSE Middleware for user_id:%s", sseData.user_id)
 		sseDatas = append(sseDatas, sseData)
 		c.Set(WEB_CONTEXT_SSE_DATA, sseData)
 		sseChannels <- sseData
@@ -79,7 +79,7 @@ func sseMiddleware() gin.HandlerFunc {
 			<-c.Writer.CloseNotify()
 
 			sseData.destroy = true
-			log.Printf("Should close SSE %s, %v", sseData.user_id, sseData)
+			slog.Debug("Should close SSE %s, %v", sseData.user_id, sseData)
 		}()
 
 		c.Next()
@@ -92,11 +92,11 @@ func seeListening() {
 		// Add new available client
 		case client := <-sseChannels:
 			if client.destroy {
-				log.Printf("SSE FORCE DISCONNECT -> user_id: %s", client.user_id)
+				slog.Debug("SSE FORCE DISCONNECT -> user_id: %s", client.user_id)
 				// delete(sseChannels, client)
 				// close(client.message)
 			} else {
-				log.Printf("SSE CONNECTION -> user_id: %s", client.user_id)
+				slog.Debug("SSE CONNECTION -> user_id: %s", client.user_id)
 			}
 		}
 	}

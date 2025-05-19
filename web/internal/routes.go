@@ -3,7 +3,8 @@ package internal
 import (
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
+	"net/http"
 	"slices"
 	"time"
 
@@ -13,9 +14,13 @@ import (
 
 // --------------------------
 
+// List of users
 var users = []*fakeUserData{}
+
+// List of marchmaking
 var matchmaking = []*matchmakingData{}
 
+// List of SSE data of users
 var sseDatas = []*sseData{}
 
 //--------------------------
@@ -88,16 +93,15 @@ func dashboardRoute(c *gin.Context) {
 }
 
 type matchmakingBody struct {
-	game string `json:"game"`
+	Game string `json:"game"`
 }
 
 // method: POST, validate user and search for a match. this endpoint return a 202.
 // after the match have the required amount of players is gooing to notify by SSE
 func searchMatchRoute(c *gin.Context) {
-	// TODO: missing middleware
 	u, ok := c.Get(WEB_CONTEXT_USER_DATA)
 	if !ok {
-		c.JSON(401, gin.H{
+		c.JSON(http.StatusUnauthorized, gin.H{
 			"error": "Dashboard - Unauthorized",
 		})
 		return
@@ -105,37 +109,46 @@ func searchMatchRoute(c *gin.Context) {
 	player, ok := u.(*fakeUserData)
 	if !ok {
 		// TODO: should return an 50X
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Dashboard - Unauthorized",
+		})
 		return
 	}
 
 	var matchmakingBody matchmakingBody
 	if err := c.BindJSON(&matchmakingBody); err != nil {
-		c.JSON(400, gin.H{
+		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Invalid payload",
 		})
 		return
 	}
 
-	pos := slices.IndexFunc(matchmaking, func(m *matchmakingData) bool {
-		return m.game == matchmakingBody.game && m.status == MATCHMAKING_STATUS_WAITING && len(m.playersId) < int(m.requiredPlayers)
+	// *NOTE: Check if user already listening for SSE event.
+	pos := slices.IndexFunc(sseDatas, func(s *sseData) bool { return s.user_id == player.id })
+	if pos == -1 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Client should listeng for /api/match-notification before to call for a search match",
+		})
+		return
+	}
+
+	pos = slices.IndexFunc(matchmaking, func(m *matchmakingData) bool {
+		return m.game == matchmakingBody.Game && m.status == MATCHMAKING_STATUS_WAITING && len(m.playersId) < int(m.requiredPlayers)
 	})
 
 	now := time.Now()
 	if pos == -1 {
 		match := &matchmakingData{
-			game:            matchmakingBody.game,
+			game:            matchmakingBody.Game,
 			createdAt:       now.Unix(),
 			updatedAt:       now.Unix(),
 			status:          MATCHMAKING_STATUS_WAITING,
 			requiredPlayers: 2,
 			playersId:       []string{player.id},
 		}
-		log.Printf("matchmaking Pos %d, and match: %v", pos, match)
 		matchmaking = append(matchmaking, match)
 	} else {
 		match := matchmaking[pos]
-		log.Printf("matchmaking Pos %d, and match: %v", pos, matchmaking[pos])
-		// TODO: check that playerId not exist in the list
 		match.playersId = append(match.playersId, player.id)
 		match.updatedAt = now.Unix()
 
@@ -143,26 +156,24 @@ func searchMatchRoute(c *gin.Context) {
 			// TODO: create Websocket tokens
 			// TODO: save into new array gameServerData
 			// TODO: notify all users by SSE
-			log.Printf("Found a match wiht players %v", match.playersId)
 			match.status = MATCHMAKING_STATUS_IN_PROGRESS
 
-			//!ERROR: sseDatas dosnt have the last user yet. WTF
 			for _, v := range match.playersId {
-				log.Printf("\n		- MATCH - Searching playerId:%s; sseDataLen:%d;\n", v, len(sseDatas))
 				pos := slices.IndexFunc(sseDatas, func(s *sseData) bool { return s.user_id == v })
 				if pos > -1 {
 					sseDatas[pos].message <- fmt.Sprintf("game:%s;total_players:%d;", match.game, match.requiredPlayers)
 				} else {
-					log.Printf("ERROR: Something is not correct. the sseDatas dosn't have the user to notify it.")
+					//! if user not connected or lost connection, Should we rollback the notificaiton? Interesting point :P
+					slog.Error("ERROR: Something is not correct. the sseDatas dosn't have the user to notify it.")
 				}
 			}
 
 		}
-		log.Printf("After - matchmaking Pos %d, and match: %v", pos, matchmaking[pos])
+		slog.Debug("After - matchmaking Pos %d, and match: %v", pos, matchmaking[pos])
 	}
 
 	// TODO: return temporary token should be the best action to do
-	c.JSON(202, gin.H{
+	c.JSON(http.StatusAccepted, gin.H{
 		"status": "waiting for other players",
 	})
 }
@@ -182,10 +193,9 @@ func sendNotificationsRoute(c *gin.Context) {
 	if !ok {
 		return
 	}
-	log.Printf("\n	-	WEB_CONTEXT_SSE_DATA => user_id: %s, destroy: %b", data.user_id, data.destroy)
 
 	c.Stream(func(w io.Writer) bool {
-		// Stream message to client from message channel
+		// send SSE message to FE
 		if msg, ok := <-data.message; ok {
 			c.SSEvent("message", msg)
 			return true

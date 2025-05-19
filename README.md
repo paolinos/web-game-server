@@ -12,25 +12,25 @@ Libraries:
 ```mermaid
 sequenceDiagram
     actor device
-    participant Api
+    participant Web
     participant GameServer
     participant Nats
 
-    device -)+ Api: POST /signin {email:string passsword: string }
-    Api-) Nats: check DB and generate token
-    Api--)- device: { token: string }
+    device -)+ Web: POST /signin {email:string passsword: string }
+    Web-) Nats: check DB and generate token
+    Web--)- device: { token: string }
 
-    device -)+ Api: GET /dashboard with token
-    Api-) Nats: check token
-    Api-) Nats: get user information
-    Api--)- device: return user information (points, played games, etc)
+    device -)+ Web: GET /dashboard with token
+    Web-) Nats: check token
+    Web-) Nats: get user information
+    Web--)- device: return user information (points, played games, etc)
 
-    device ->>+ Api: GET /sse (server-sent events)
-    device -)+ Api: POST /search-match
-    Api-) Nats: Storage fata into DB
-    Api--)- device: after have all user return match information
-    Api-) Nats: Notify GameServer about Match information and users
-    Api--)- device: disconnect WS
+    device ->>+ Web: GET /sse (server-sent events)
+    device -)+ Web: POST /search-match
+    Web-) Nats: Storage fata into DB
+    Web--)- device: after have all user return match information
+    Web-) Nats: Notify GameServer about Match information and users
+    Web--)- device: close SSE
 
 
     device ->>+ GameServer: GET /ws Connect to Websocket
@@ -40,9 +40,23 @@ sequenceDiagram
         device-->GameServer: device send update, and also recieve other device update
     end
     GameServer --) device: End Game Or time out or one of the player won
-    GameServer --) Nats: Notify Api with the result of the match
-    GameServer ->>- device: disconnect
+    GameServer --) Nats: Notify Web with the result of the match, points of users and all game information
+    GameServer ->>- device: disconnect WS
 
+```
+
+### Projects
+
+- [Web Project](#web-project)
+
+
+#### Web Project
+Web project it's a web server, with some api endpoints, and Server Side Event.
+
+```sh
+cd web
+
+go run ./cmd/web.go
 ```
 
 
@@ -60,4 +74,5 @@ g { color: Green }
     - <r>[ ] TODO:</r> Start with API in Golang
     - <r>[ ] TODO:</r> Start with GameServer in Golang
     - <r>[ ] TODO:</r> Create basic TicTacToe game puse js
+
 

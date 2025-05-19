@@ -2,22 +2,18 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"paolinos/web-game-server/web/internal"
 )
 
 func main() {
-	fmt.Println("Hello, World!")
 
-	// Esto lo tiene que hacer el Web Server
-	// GET / => return static web
-	// POST /api/signin => email, password , return token
-	// GET /api/dashboard => return user information, username, points, etc.
-	// GET /api/sse => SSE for match maker. return event when have the mach maker have already the min players
-	// POST /api/search-mack => game: tictactoe
-
+	slog.SetLogLoggerLevel(slog.LevelDebug)
 	server := internal.NewWebServer()
 
-	server.Run(8000)
+	port := 8000
+	slog.Info(fmt.Sprintf("Starting server at port: %d", port))
+	server.Run(port)
 
 	// PubSub
 }

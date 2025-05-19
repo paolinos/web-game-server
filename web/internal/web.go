@@ -13,14 +13,9 @@ type WebApp struct {
 	server *gin.Engine
 }
 
-// GET / => return static web
-// POST /api/signin => email, password , return token
-// GET /api/dashboard => return user information, username, points, etc.
-// GET /api/sse => SSE for match maker. return event when have the mach maker have already the min players
-// POST /api/search-mack => game: tictactoe
-// Routes
+// Healthcheck endpoint
 func healthcheck(c *gin.Context) {
-	c.JSON(200, gin.H{
+	c.JSON(http.StatusOK, gin.H{
 		"message": "service healthy",
 	})
 }
@@ -52,6 +47,7 @@ func NewWebServer() *WebApp {
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
+	// Return index page
 	s.GET("/", func(c *gin.Context) {
 		var mainErr error
 		defer func() {
@@ -81,6 +77,7 @@ func NewWebServer() *WebApp {
 	return webServer
 }
 
+// Run web server at port
 func (w *WebApp) Run(port int) {
 	var host = fmt.Sprintf("0.0.0.0:%d", port)
 	w.server.Run(host)

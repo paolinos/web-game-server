@@ -159,7 +159,7 @@
                 console.error("SSE failed:", err);
                 evtSource.close()
             };
-
+            
             const data = await callApi("search-match", "POST", {game: "TIC-TAC-TOE"});
         })
     </script>
