@@ -7,6 +7,8 @@ import (
 	"slices"
 	"time"
 
+	"paolinos/web-game-server/web/internal/lang"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -22,19 +24,17 @@ func authMiddleware() gin.HandlerFunc {
 
 		token := c.Request.Header.Get("Authorization")
 		if token == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Unauthorized",
-			})
-			c.Abort()
+			slog.Debug("Middleware: Missing token")
+
+			ErrorJsonResponse(c, http.StatusUnauthorized, lang.ERROR_UNAUTHORIZED)
 			return
 		}
 
 		pos := slices.IndexFunc(users, func(c *fakeUserData) bool { return c.token == token })
 		if pos == -1 {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Middleware - Unauthorized. Invalid token",
-			})
-			c.Abort()
+			slog.Debug("Middleware: Token not found")
+
+			ErrorJsonResponse(c, http.StatusUnauthorized, lang.ERROR_UNAUTHORIZED)
 			return
 		}
 
@@ -58,10 +58,8 @@ func sseMiddleware() gin.HandlerFunc {
 		// TODO: we're using 'tmp' as email and not one usage token. This is not secure, so be aware of this.
 		pos := slices.IndexFunc(users, func(c *fakeUserData) bool { return c.email == tmp })
 		if pos == -1 {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Middleware - Unauthorized. Invalid token",
-			})
-			c.Abort()
+			slog.Info(fmt.Sprintf("SSE Middleware: User with email:%s was not found", tmp))
+			ErrorJsonResponse(c, http.StatusUnauthorized, lang.ERROR_UNAUTHORIZED)
 			return
 		}
 		userData := users[pos]

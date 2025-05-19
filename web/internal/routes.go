@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"paolinos/web-game-server/web/internal/lang"
 	"slices"
 	"time"
 
@@ -35,9 +36,8 @@ func signinRoute(c *gin.Context) {
 
 	var requestBody signInBody
 	if err := c.BindJSON(&requestBody); err != nil {
-		c.JSON(400, gin.H{
-			"error": "Invalid payload",
-		})
+
+		ErrorJsonResponse(c, http.StatusBadRequest, lang.ERROR_INVALID_PAYLOAD)
 		return
 	}
 
@@ -65,7 +65,7 @@ func signinRoute(c *gin.Context) {
 		users = append(users, data)
 	}
 
-	c.JSON(200, gin.H{
+	c.JSON(http.StatusOK, gin.H{
 		"token": data.token,
 	})
 }
@@ -74,9 +74,8 @@ func dashboardRoute(c *gin.Context) {
 
 	u, ok := c.Get(WEB_CONTEXT_USER_DATA)
 	if !ok {
-		c.JSON(401, gin.H{
-			"error": "Dashboard - Unauthorized",
-		})
+		slog.Debug("Dashboard (/dashboard): user_data not found, Invalid user. Unauthorized.")
+		ErrorJsonResponse(c, http.StatusUnauthorized, lang.ERROR_UNAUTHORIZED)
 		return
 	}
 	user, ok := u.(*fakeUserData)
@@ -85,7 +84,7 @@ func dashboardRoute(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, gin.H{
+	c.JSON(http.StatusOK, gin.H{
 		"username": user.username,
 		"points":   user.points,
 		"matches":  user.matches,
@@ -101,25 +100,21 @@ type matchmakingBody struct {
 func searchMatchRoute(c *gin.Context) {
 	u, ok := c.Get(WEB_CONTEXT_USER_DATA)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "Dashboard - Unauthorized",
-		})
+		slog.Debug("Dashboard (search-match): user_data not found, Invalid user. Unauthorized.")
+		ErrorJsonResponse(c, http.StatusUnauthorized, lang.ERROR_UNAUTHORIZED)
 		return
 	}
 	player, ok := u.(*fakeUserData)
 	if !ok {
-		// TODO: should return an 50X
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Dashboard - Unauthorized",
-		})
+		slog.Error("Dashboard (search-match): Unexpected error casting user_data as fakeUserData.")
+		ErrorJsonResponse(c, http.StatusInternalServerError, lang.ERROR_UNEXPECTED)
 		return
 	}
 
 	var matchmakingBody matchmakingBody
 	if err := c.BindJSON(&matchmakingBody); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid payload",
-		})
+		slog.Debug("Dashboard (search-match): Invalid payload")
+		ErrorJsonResponse(c, http.StatusBadRequest, lang.ERROR_INVALID_PAYLOAD)
 		return
 	}
 

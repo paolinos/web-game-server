@@ -51,7 +51,7 @@ sequenceDiagram
 
 
 #### Web Project
-Web project it's a web server, with some api endpoints, and Server Side Event.
+Web project it's a web server, with some api endpoints, and Server-Sent Events [SSE](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events)
 
 ```sh
 cd web
