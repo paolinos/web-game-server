@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 
+	"paolinos/web-game-server/web/internal/middleware"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -33,13 +35,13 @@ func NewWebServer() *WebApp {
 	s := gin.Default()
 
 	apiGroup := s.Group("/api")
-	apiGroup.Use(authMiddleware())
+	apiGroup.Use(middleware.AuthMiddleware())
 	{
 		apiGroup.GET("/dashboard", dashboardRoute)
 		apiGroup.POST("/search-match", searchMatchRoute)
 	}
-	s.GET("/api/match-notification", sseMiddleware(), sendNotificationsRoute)
-	go seeListening()
+	s.GET("/api/match-notification", middleware.SseMiddleware(), sendNotificationsRoute)
+	go middleware.SseListening()
 
 	s.GET("/api/healthcheck", healthcheck)
 	s.POST("/api/signin", signinRoute)

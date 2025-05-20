@@ -1,4 +1,4 @@
-package internal
+package httpherlper
 
 import (
 	"github.com/gin-gonic/gin"
