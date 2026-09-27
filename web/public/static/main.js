@@ -1,5 +1,7 @@
-const SERVER_HOST = "http://localhost:8000/api";
+const SERVER_HOST = "http://localhost:8000";
+const API_HOST = `${SERVER_HOST}/api`;
 let api_token = undefined;
+let ws = null; // WebSocket connection
 
 /**
  * Call API
@@ -15,7 +17,7 @@ const callApi = async (path, method, body = undefined) => {
     if (api_token) {
         headers["Authorization"] = api_token;
     }
-    const response = await fetch(`${SERVER_HOST}/${path}`, {
+    const response = await fetch(`${API_HOST}/${path}`, {
         method,
         headers,
         body: body ? JSON.stringify(body) : undefined
@@ -28,6 +30,56 @@ const callApi = async (path, method, body = undefined) => {
         throw new Error(err);
     }
     return bodyResult;
+}
+
+/**
+ * Establish WebSocket connection for real-time notifications
+ */
+const connectWebSocket = (api_token) => {
+    if (!api_token) {
+        console.log("WebSocket: no token, cannot connect");
+        return;
+    }
+
+    ws = new WebSocket(`${SERVER_HOST}/ws`);
+    ws.addEventListener("open", (event) => {
+        ws.send(JSON.stringify({
+            "token":api_token
+        }));
+    });
+    ws.addEventListener("message", (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'match') {
+                console.log("WebSocket: match notification received", data);
+                // Reload dashboard to show new match
+                loadDashboard();
+            } else if (data.type === 'error') {
+                console.error("WebSocket error:", data.message);
+            }
+        } catch (e) {
+            console.error("WebSocket: failed to parse message", e, event.data);
+        }
+    });
+
+    ws.addEventListener("close", () => {
+        console.log("WebSocket: disconnected");
+        ws = null;
+    })
+    ws.addEventListener("error", (error) => {
+        console.error("WebSocket error:", error);
+        ws = null;
+    });
+};
+
+/**
+ * Close WebSocket connection
+ */
+const disconnectWebSocket = () => {
+    if (ws) {
+        ws.close();
+        ws = null;
+    }
 };
 
 const LOGIN_VIEW = "loginSection";
@@ -98,7 +150,7 @@ createApp({
                 headers["Authorization"] = this.api_token;
             }
 
-            const response = await fetch(`${SERVER_HOST}/${path}`, {
+            const response = await fetch(`${API_HOST}/${path}`, {
                 method,
                 headers,
                 body: body ? JSON.stringify(body) : undefined
@@ -119,11 +171,19 @@ createApp({
                 return;
             }
 
-            const {token} = await this.callApi("signin", "POST", { email, username })
-            this.api_token = token;
-            this.isLoggedIn = true;
-            await this.loadDashboard();
-            ViewManager.loadView(HOME_VIEW);
+            try {
+                const {token} = await this.callApi("signin", "POST", { email, username })
+                this.api_token = token;
+                this.isLoggedIn = true;
+                
+                // Connect WebSocket for real-time notifications
+                connectWebSocket(token);
+                
+                await this.loadDashboard();
+                ViewManager.loadView(HOME_VIEW);
+            } catch (err) {
+                console.error("Signin failed:", err);
+            }
         },
 
         async loadDashboard() {
@@ -148,7 +208,7 @@ createApp({
 
         async searchMatch() {
             //! TODO: if we want a token we need to ask fist and then call
-            const evtSource = new EventSource(`${SERVER_HOST}/match-notification?tmp=${txtEmail.value}`);
+            const evtSource = new EventSource(`${API_HOST}/match-notification?tmp=${txtEmail.value}`);
             evtSource.addEventListener("notice", (e) => {
                 //! TO DELETE
                 console.log("SSE notice:", e); 
@@ -188,6 +248,9 @@ createApp({
             // Clear form
             document.getElementById("txtEmail").value = "";
             document.getElementById("txtUsername").value = "";
+
+            // Disconnect WebSocket
+            disconnectWebSocket();
         }
     },
 
@@ -228,5 +291,10 @@ createApp({
 
         // Start with login view
         ViewManager.loadView(LOGIN_VIEW);
+
+        // Clean up WebSocket on page unload
+        window.addEventListener('beforeunload', () => {
+            disconnectWebSocket();
+        });
     }
 }).mount("#loginSection");

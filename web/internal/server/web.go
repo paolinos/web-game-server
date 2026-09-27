@@ -8,7 +8,6 @@ import (
 	"paolinos/web-game-server/web/internal/middleware"
 
 	"github.com/labstack/echo/v5"
-	//echo_middleware "github.com/labstack/echo/v5/middleware"
 )
 
 type WebApp struct {
@@ -50,13 +49,15 @@ func NewWebServer() *WebApp {
 	e.Static("/static", getWorkingDirectory()+"/public/static")
 	e.File("/", getWorkingDirectory()+"/public/index.html")
 
+	e.GET("/ws", websocketHandler)
+
 	webServer := &WebApp{
 		server: e,
 	}
 	return webServer
 }
 
-// Run web server at port
+// Run web server at port with WebSocket support
 func (w *WebApp) Run(port int) {
 	var host = fmt.Sprintf("0.0.0.0:%d", port)
 	w.server.Start(host)
