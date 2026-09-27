@@ -1,10 +1,10 @@
-package internal
+package server
 
 import (
 	"encoding/json"
-	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	dbpk "paolinos/web-game-server/web/internal/db"
@@ -14,8 +14,8 @@ import (
 	"paolinos/web-game-server/web/internal/middleware"
 	"paolinos/web-game-server/web/internal/models"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/labstack/echo/v5"
 )
 
 // --------------------------
@@ -25,16 +25,14 @@ import (
 type signInBody struct {
 	Email    string `json:"email"`
 	Username string `json:"username"`
-	//Password string `json:"password"`
 }
 
-func signinRoute(c *gin.Context) {
+func signinRoute(c *echo.Context) error {
 
 	var requestBody signInBody
-	if err := c.BindJSON(&requestBody); err != nil {
+	if err := c.Bind(&requestBody); err != nil {
 
-		httpherlper.ErrorJsonResponse(c, http.StatusBadRequest, lang.ERROR_INVALID_PAYLOAD)
-		return
+		return httpherlper.ErrorJsonResponse(c, http.StatusBadRequest, lang.ERROR_INVALID_PAYLOAD)
 	}
 
 	db := dbpk.GetDbContext()
@@ -46,32 +44,29 @@ func signinRoute(c *gin.Context) {
 	} else {
 
 		id, _ := uuid.NewUUID()
-		// TODO: create a real token
 		tk := "tk"
 		tmp := db.UserRepo.Add(id.String(), requestBody.Email, requestBody.Username, helpers.GenerateRandomHex(25, &tk))
 		data = &tmp
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	return c.JSON(http.StatusOK, map[string]string{
 		"token": data.Token,
 	})
 }
 
-func dashboardRoute(c *gin.Context) {
+func dashboardRoute(c *echo.Context) error {
 
-	u, ok := c.Get(models.WEB_CONTEXT_USER_DATA)
-	if !ok {
+	u := c.Get(models.WEB_CONTEXT_USER_DATA)
+	if u == nil {
 		slog.Debug("Dashboard (/dashboard): user_data not found, Invalid user. Unauthorized.")
-		httpherlper.ErrorJsonResponse(c, http.StatusUnauthorized, lang.ERROR_UNAUTHORIZED)
-		return
+		return httpherlper.ErrorJsonResponse(c, http.StatusUnauthorized, lang.ERROR_UNAUTHORIZED)
 	}
 	user, ok := u.(*models.FakeUserData)
 	if !ok {
-		// TODO: should return an 50X
-		return
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "unexpected"})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	return c.JSON(http.StatusOK, map[string]interface{}{
 		"username": user.Username,
 		"points":   user.Points,
 		"matches":  user.Matches,
@@ -84,34 +79,29 @@ type matchmakingBody struct {
 
 // method: POST, validate user and search for a match. this endpoint return a 202.
 // after the match have the required amount of players is gooing to notify by SSE
-func searchMatchRoute(c *gin.Context) {
-	u, ok := c.Get(models.WEB_CONTEXT_USER_DATA)
-	if !ok {
+func searchMatchRoute(c *echo.Context) error {
+	u := c.Get(models.WEB_CONTEXT_USER_DATA)
+	if u == nil {
 		slog.Debug("Dashboard (search-match): user_data not found, Invalid user. Unauthorized.")
-		httpherlper.ErrorJsonResponse(c, http.StatusUnauthorized, lang.ERROR_UNAUTHORIZED)
-		return
+		return httpherlper.ErrorJsonResponse(c, http.StatusUnauthorized, lang.ERROR_UNAUTHORIZED)
 	}
 	player, ok := u.(*models.FakeUserData)
 	if !ok {
 		slog.Error("Dashboard (search-match): Unexpected error casting user_data as fakeUserData.")
-		httpherlper.ErrorJsonResponse(c, http.StatusInternalServerError, lang.ERROR_UNEXPECTED)
-		return
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "unexpected"})
 	}
 
 	var matchmakingBody matchmakingBody
-	if err := c.BindJSON(&matchmakingBody); err != nil {
+	if err := c.Bind(&matchmakingBody); err != nil {
 		slog.Debug("Dashboard (search-match): Invalid payload")
-		httpherlper.ErrorJsonResponse(c, http.StatusBadRequest, lang.ERROR_INVALID_PAYLOAD)
-		return
+		return httpherlper.ErrorJsonResponse(c, http.StatusBadRequest, lang.ERROR_INVALID_PAYLOAD)
 	}
 
 	db := dbpk.GetDbContext()
-	// *NOTE: Check if user already listening for SSE event.
 	p := db.SseListeningRepo.GetByUserId(player.Id)
 	if p == nil {
 		slog.Debug("SearchMatchRoute: Player is not listening for SSE")
-		httpherlper.ErrorJsonResponse(c, http.StatusBadRequest, lang.VALIDATION_USER_NOT_LISTENING_SSE)
-		return
+		return httpherlper.ErrorJsonResponse(c, http.StatusBadRequest, lang.VALIDATION_USER_NOT_LISTENING_SSE)
 	}
 
 	match := db.MatchmakingRepo.GetByGameAndWaiting(matchmakingBody.Game)
@@ -120,26 +110,21 @@ func searchMatchRoute(c *gin.Context) {
 		tmp := db.MatchmakingRepo.Add(matchmakingBody.Game, []string{player.Id})
 		match = &tmp
 	} else {
-		// TODO: We should change this code when we use a real DB. too many queries
 		db.MatchmakingRepo.UpdatePlayers(match, player.Id)
 
 		if len(match.PlayersId) == int(match.RequiredPlayers) {
-			// TODO: check comment below
 			db.MatchmakingRepo.UpdateStatus(match, models.MATCHMAKING_STATUS_IN_PROGRESS)
 
-			// TODO: For this should need a chan
 			for _, v := range match.PlayersId {
 				ssePlayer := db.SseListeningRepo.GetByUserId(v)
 				sseCache := middleware.SseCacheData.GetBy(v)
 				if ssePlayer != nil && sseCache != nil {
 
-					// TODO: we should include username & id
 					tmp := map[string]any{"game": match.Game, "total_players": match.RequiredPlayers, "players": match.PlayersId}
 					msg, _ := json.Marshal(tmp)
 
 					sseCache.Message <- string(msg)
 				} else {
-					//! if user not connected or lost connection? We should set the mach again in MATCHMAKING_STATUS_WAITING and send an error to the user
 					slog.Error("ERROR: Something is not correct. the sseDatas dosn't have the user to notify it.")
 				}
 			}
@@ -147,8 +132,7 @@ func searchMatchRoute(c *gin.Context) {
 		}
 	}
 
-	// TODO: return temporary token should be the best action to do
-	c.JSON(http.StatusAccepted, gin.H{
+	return c.JSON(http.StatusAccepted, map[string]string{
 		"status": "waiting for other players",
 	})
 }
@@ -159,25 +143,39 @@ type MessageBody struct {
 }
 
 // Listen and send server-side event
-func sendNotificationsRoute(c *gin.Context) {
-	v, ok := c.Get(models.WEB_CONTEXT_SSE_DATA)
-	if !ok {
+func sendNotificationsRoute(c *echo.Context) error {
+	v := c.Get(models.WEB_CONTEXT_SSE_DATA)
+	if v == nil {
 		slog.Error("Impossible to get WEB_CONTEXT_SSE_DATA")
-		return
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "internal"})
 	}
 	data, ok := v.(*middleware.SseData)
 	if !ok {
 		slog.Error("Error trying to parse the SseData object from context")
-		return
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "internal"})
 	}
 
-	c.Stream(func(w io.Writer) bool {
-		// send SSE message to FE
-		if msg, ok := <-data.Message; ok {
-			c.SSEvent("message", msg)
-			middleware.SseCacheData.Delete(data.UserId)
-			return true
-		}
-		return false
-	})
+	c.Response().WriteHeader(http.StatusOK)
+	w := c.Response()
+	for msg := range data.Message {
+		w.Write([]byte("event: message\n"))
+		w.Write([]byte("data: " + msg))
+		w.Write([]byte("\n\n"))
+		middleware.SseCacheData.Delete(data.UserId)
+	}
+
+	return nil
+}
+
+func indextRoute(c *echo.Context) error {
+	// TODO: we should return the "public/index.html"
+	filePath := getWorkingDirectory() + "/public/index.html"
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		slog.Error("Error trying to load index.html", "path", filePath, "error", err)
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "index.html not found"})
+	}
+
+	c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
+	return c.String(http.StatusOK, string(data))
 }
