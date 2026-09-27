@@ -1,12 +1,11 @@
 package httpherlper
 
 import (
-	"github.com/gin-gonic/gin"
+	"github.com/labstack/echo/v5"
 )
 
-func ErrorJsonResponse(c *gin.Context, statusCode int, errorBody string) {
-	c.JSON(statusCode, gin.H{
+func ErrorJsonResponse(c *echo.Context, statusCode int, errorBody string) error {
+	return c.JSON(statusCode, map[string]string{
 		"error": errorBody,
 	})
-	c.Abort()
 }
