@@ -34,10 +34,15 @@ func (m *MockWebSocketConn) CloseNow() {
 	m.Called()
 }
 
-func TestGiven_A_NewWebsocketClient(t *testing.T) {
-
+func createWebsocketAndMock() (*MockWebSocketConn, *WebsocketClient) {
 	mockWebsocket := new(MockWebSocketConn)
 	conn := NewWebsocketClient(mockWebsocket, "1", "user")
+	return mockWebsocket, conn
+}
+
+func Test_NewWebsocketClient_Send(t *testing.T) {
+
+	mockWebsocket, conn := createWebsocketAndMock()
 
 	t.Run("when sending a message, it should succeed", func(t *testing.T) {
 		msg := "some message"
@@ -48,13 +53,11 @@ func TestGiven_A_NewWebsocketClient(t *testing.T) {
 
 		assert.Nil(t, err, "error should be nil")
 	})
-
 }
 
-func TestGiven_A_NewWebsocketClient_WhenDisconnected(t *testing.T) {
+func Test_NewWebsocketClient_Send_Disconnected(t *testing.T) {
 
-	mockWebsocket := new(MockWebSocketConn)
-	conn := NewWebsocketClient(mockWebsocket, "1", "user")
+	mockWebsocket, conn := createWebsocketAndMock()
 	t.Run("when sending a message while disconnected, it should succeed", func(t *testing.T) {
 
 		// Mock CloseNow to be called once when Disconnect is invoked
@@ -69,10 +72,9 @@ func TestGiven_A_NewWebsocketClient_WhenDisconnected(t *testing.T) {
 
 }
 
-func TestGiven_A_NewWebsocketClient_WhenError(t *testing.T) {
+func Test_NewWebsocketClient_Send_Error(t *testing.T) {
 
-	mockWebsocket := new(MockWebSocketConn)
-	conn := NewWebsocketClient(mockWebsocket, "1", "user")
+	mockWebsocket, conn := createWebsocketAndMock()
 	t.Run("when sending a message and an error is detected, it should return the error", func(t *testing.T) {
 
 		// Mock Write to return an error when called once
@@ -84,10 +86,9 @@ func TestGiven_A_NewWebsocketClient_WhenError(t *testing.T) {
 	})
 }
 
-func TestGiven_A_NewWebsocketClient_WhenSendJson(t *testing.T) {
+func Test_NewWebsocketClient_SendJson(t *testing.T) {
 
-	mockWebsocket := new(MockWebSocketConn)
-	conn := NewWebsocketClient(mockWebsocket, "1", "user")
+	mockWebsocket, conn := createWebsocketAndMock()
 	t.Run("when sending a JSON object, it should be marshaled and sent successfully", func(t *testing.T) {
 
 		// Mock Write to return nil (success) when called with MessageText and any data
@@ -100,10 +101,9 @@ func TestGiven_A_NewWebsocketClient_WhenSendJson(t *testing.T) {
 	})
 }
 
-func TestGiven_A_NewWebsocketClient_WhenSendJsonFails(t *testing.T) {
+func Test_NewWebsocketClient_SendJson_Error(t *testing.T) {
 
-	mockWebsocket := new(MockWebSocketConn)
-	conn := NewWebsocketClient(mockWebsocket, "1", "user")
+	mockWebsocket, conn := createWebsocketAndMock()
 	t.Run("when sending a JSON object that fails to marshal, it should return an error", func(t *testing.T) {
 
 		// Mock Write to never be called (since marshaling will fail first)
@@ -116,10 +116,9 @@ func TestGiven_A_NewWebsocketClient_WhenSendJsonFails(t *testing.T) {
 	})
 }
 
-func TestGiven_A_NewWebsocketClient_WhenReceiveRoutine(t *testing.T) {
+func Test_NewWebsocketClient_ReceiveRoutine(t *testing.T) {
 
-	mockWebsocket := new(MockWebSocketConn)
-	conn := NewWebsocketClient(mockWebsocket, "1", "user")
+	mockWebsocket, conn := createWebsocketAndMock()
 	t.Run("when receiving a message, it should call the provided function", func(t *testing.T) {
 		message := "hello"
 		// Mock Read to return a text message with data
@@ -139,10 +138,9 @@ func TestGiven_A_NewWebsocketClient_WhenReceiveRoutine(t *testing.T) {
 	})
 }
 
-func TestGiven_A_NewWebsocketClient_WhenReceiveRoutineError(t *testing.T) {
+func TestNewWebsocketClient_ReceiveRoutine_Error(t *testing.T) {
 
-	mockWebsocket := new(MockWebSocketConn)
-	conn := NewWebsocketClient(mockWebsocket, "1", "user")
+	mockWebsocket, conn := createWebsocketAndMock()
 	t.Run("when receiving an error during read, it should stop the receive routine", func(t *testing.T) {
 
 		// Mock Read to return an error
@@ -164,10 +162,9 @@ func TestGiven_A_NewWebsocketClient_WhenReceiveRoutineError(t *testing.T) {
 	})
 }
 
-func TestGiven_A_NewWebsocketClient_WhenDisconnect(t *testing.T) {
+func Test_NewWebsocketClient_Disconnect(t *testing.T) {
 
-	mockWebsocket := new(MockWebSocketConn)
-	conn := NewWebsocketClient(mockWebsocket, "1", "user")
+	mockWebsocket, conn := createWebsocketAndMock()
 	t.Run("when disconnecting, it should close the connection and set conn to nil", func(t *testing.T) {
 
 		// Mock CloseNow to be called once when Disconnect is invoked
@@ -179,10 +176,9 @@ func TestGiven_A_NewWebsocketClient_WhenDisconnect(t *testing.T) {
 	})
 }
 
-func TestGiven_A_NewWebsocketClient_WhenSendWithNilConn(t *testing.T) {
+func Test_NewWebsocketClient_Disconnect_Disconnected(t *testing.T) {
 
-	mockWebsocket := new(MockWebSocketConn)
-	conn := NewWebsocketClient(mockWebsocket, "1", "user")
+	mockWebsocket, conn := createWebsocketAndMock()
 	t.Run("when sending after disconnect, it should return nil (connection already closed)", func(t *testing.T) {
 
 		// Mock CloseNow to be called once when Disconnect is invoked
