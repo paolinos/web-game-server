@@ -1,4 +1,4 @@
-package server
+package ws_server
 
 import (
 	"context"
@@ -17,10 +17,10 @@ type AuthMessage struct {
 
 func readMessage(conn *websocket.Conn, ctx context.Context) (string, error) {
 	msgType, data, err := conn.Read(ctx)
-	slog.Info("Reading fist message", msgType, data)
+	slog.Info("Reading first message", "msgType", msgType, "data", string(data))
 	//err = json.Unmarshal([]byte(data), auth)
 	if err != nil {
-		slog.Warn("Parsing Websocket message", err)
+		slog.Warn("Parsing Websocket message", "error", err)
 		return "", err
 	}
 	return string(data), nil
@@ -29,13 +29,13 @@ func readMessage(conn *websocket.Conn, ctx context.Context) (string, error) {
 func readJsonMessage[T any](conn *websocket.Conn, ctx context.Context, auth *T) error {
 	err := wsjson.Read(ctx, conn, &auth)
 	if err != nil {
-		slog.Warn("Parsing Websocket Json message", err)
+		slog.Warn("Parsing Websocket Json message", "error", err)
 		return err
 	}
 	return nil
 }
 
-func websocketHandler(c *echo.Context) error {
+func WebsocketHandler(c *echo.Context) error {
 	// Upgrade the HTTP connection to WebSocket.
 	conn, err := websocket.Accept(c.Response(), c.Request(), &websocket.AcceptOptions{
 		// Configure this properly for your application.
@@ -70,8 +70,9 @@ func websocketHandler(c *echo.Context) error {
 	*/
 
 	var auth AuthMessage
-	err = readJsonMessage(conn, authCtx, &auth)
+	err = wsjson.Read(authCtx, conn, &auth)
 	if err != nil {
+		slog.Warn("Parsing Websocket Json message", "error", err)
 		_ = conn.Close(
 			websocket.StatusPolicyViolation,
 			"authentication required",
@@ -107,15 +108,15 @@ func websocketHandler(c *echo.Context) error {
 	for {
 		msgType, data, err := conn.Read(ctx)
 		if err != nil {
-			slog.Error("websocket read error: %v", err)
+			slog.Error("websocket read error", "error", err)
 			return nil
 		}
 
-		slog.Info("received: %s", string(data))
+		slog.Info("received", "data", string(data))
 
 		// Example: echo the message back.
 		if err := conn.Write(ctx, msgType, data); err != nil {
-			slog.Error("websocket write error: %v", err)
+			slog.Error("websocket write error", "error", err)
 			return nil
 		}
 	}

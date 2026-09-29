@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"paolinos/web-game-server/web/internal/middleware"
+	ws_server "paolinos/web-game-server/web/internal/server/websocket"
 
 	"github.com/labstack/echo/v5"
 )
@@ -49,7 +50,7 @@ func NewWebServer() *WebApp {
 	e.Static("/static", getWorkingDirectory()+"/public/static")
 	e.File("/", getWorkingDirectory()+"/public/index.html")
 
-	e.GET("/ws", websocketHandler)
+	e.GET("/ws", ws_server.WebsocketHandler)
 
 	webServer := &WebApp{
 		server: e,
