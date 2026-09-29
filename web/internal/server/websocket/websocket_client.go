@@ -14,7 +14,7 @@ import (
 type WebSocketConn interface {
 	Write(ctx context.Context, msgType websocket.MessageType, data []byte) error
 	Read(ctx context.Context) (websocket.MessageType, []byte, error)
-	CloseNow()
+	CloseNow() error
 }
 
 // WebsocketClient represents a single WebSocket connection with methods for sending/receiving messages
@@ -88,7 +88,6 @@ func (c *WebsocketClient) ReceiveRoutine(fn func(msg string)) {
 				return
 			}
 			if msgType == websocket.MessageText {
-				// Call the provided function for each received message
 				go fn(string(data))
 			}
 		}
@@ -101,8 +100,10 @@ func (c *WebsocketClient) Disconnect(reason string) {
 	if c.conn == nil {
 		return // Connection already closed
 	}
-
-	slog.Info("Disconnecting WebSocket", "socket_id", c.socketId, "reason", reason)
-	c.conn.CloseNow()
+	err := c.conn.CloseNow()
+	if err != nil {
+		slog.Error("Failed to send JSON message", "socket_id", c.socketId, "error", err)
+	}
 	c.conn = nil
+	slog.Info("Disconnecting WebSocket", "socket_id", c.socketId, "reason", reason)
 }

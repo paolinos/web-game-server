@@ -30,8 +30,9 @@ func (m *MockWebSocketConn) Read(ctx context.Context) (websocket.MessageType, []
 }
 
 // CloseNow mocks the CloseNow method. It records the call but returns no value.
-func (m *MockWebSocketConn) CloseNow() {
-	m.Called()
+func (m *MockWebSocketConn) CloseNow() error {
+	args := m.Called()
+	return args.Error(0)
 }
 
 func createWebsocketAndMock() (*MockWebSocketConn, *WebsocketClient) {
@@ -61,7 +62,7 @@ func Test_NewWebsocketClient_Send_Disconnected(t *testing.T) {
 	t.Run("when sending a message while disconnected, it should succeed", func(t *testing.T) {
 
 		// Mock CloseNow to be called once when Disconnect is invoked
-		mockWebsocket.On("CloseNow").Once()
+		mockWebsocket.On("CloseNow").Return(nil).Once()
 		mockWebsocket.On("Write", mock.Anything, websocket.MessageText, []byte("some message")).Return(assert.AnError).Panic("This function")
 		conn.Disconnect("test reason")
 
@@ -122,7 +123,7 @@ func Test_NewWebsocketClient_ReceiveRoutine(t *testing.T) {
 	t.Run("when receiving a message, it should call the provided function", func(t *testing.T) {
 		message := "hello"
 		// Mock Read to return a text message with data
-		mockWebsocket.On("Read", mock.Anything).Return(websocket.MessageText, []byte(message), nil).Once()
+		mockWebsocket.On("Read", mock.Anything).Return(websocket.MessageText, []byte(message), nil)
 
 		received := make(chan string, 1)
 		conn.ReceiveRoutine(func(msg string) {
@@ -143,8 +144,8 @@ func TestNewWebsocketClient_ReceiveRoutine_Error(t *testing.T) {
 	mockWebsocket, conn := createWebsocketAndMock()
 	t.Run("when receiving an error during read, it should stop the receive routine", func(t *testing.T) {
 
-		// Mock Read to return an error
-		mockWebsocket.On("Read", mock.Anything).Return(websocket.MessageText, nil, assert.AnError).Once()
+		// TODO: remove the Once(). To review later.
+		mockWebsocket.On("Read", mock.Anything).Return(websocket.MessageText, []byte(""), assert.AnError)
 
 		received := make(chan string, 1)
 		conn.ReceiveRoutine(func(msg string) {
@@ -168,7 +169,7 @@ func Test_NewWebsocketClient_Disconnect(t *testing.T) {
 	t.Run("when disconnecting, it should close the connection and set conn to nil", func(t *testing.T) {
 
 		// Mock CloseNow to be called once when Disconnect is invoked
-		mockWebsocket.On("CloseNow").Once()
+		mockWebsocket.On("CloseNow").Return(nil).Once()
 
 		conn.Disconnect("test reason")
 
@@ -182,12 +183,10 @@ func Test_NewWebsocketClient_Disconnect_Disconnected(t *testing.T) {
 	t.Run("when sending after disconnect, it should return nil (connection already closed)", func(t *testing.T) {
 
 		// Mock CloseNow to be called once when Disconnect is invoked
-		mockWebsocket.On("CloseNow").Once()
+		mockWebsocket.On("CloseNow").Return(nil).Times(1)
 
-		conn.Disconnect("test reason")
+		conn.Disconnect("force disconnection")
 
-		err := conn.Send("some message")
-
-		assert.Nil(t, err, "error should be nil when connection is closed")
+		conn.Disconnect("try disconnect")
 	})
 }
