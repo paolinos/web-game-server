@@ -107,3 +107,8 @@ func (c *WebsocketClient) Disconnect(reason string) {
 	c.conn = nil
 	slog.Info("Disconnecting WebSocket", "socket_id", c.socketId, "reason", reason)
 }
+
+// GetSocketId returns the socket ID for this client
+func (c *WebsocketClient) GetSocketId() string {
+	return c.socketId
+}
