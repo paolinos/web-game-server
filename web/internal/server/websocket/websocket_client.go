@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/coder/websocket"
@@ -25,7 +24,6 @@ type WebsocketClient struct {
 	username    string        // Username from authentication
 	conn        WebSocketConn // Reference to the WebSocket connection (interface for testability)
 	receiveDone chan struct{} // Channel for graceful shutdown of receive routine
-	doneOnce    sync.Once     // Ensures receiveDone is closed only once
 }
 
 // NewWebsocketClient creates a new WebsocketClient instance with a generated socket ID
@@ -78,27 +76,20 @@ func (c *WebsocketClient) SendJson(obj any) error {
 
 // ReceiveRoutine starts a goroutine that reads messages from the WebSocket connection
 // and calls the provided function for each received message.
-// The routine stops automatically when the connection closes or receiveDone is closed.
+// The routine stops automatically when the connection closes
 func (c *WebsocketClient) ReceiveRoutine(fn func(msg string)) {
 	go func() {
-		defer c.doneOnce.Do(func() { close(c.receiveDone) })
+		defer close(c.receiveDone)
 
 		for {
-			select {
-			case <-c.receiveDone:
+			msgType, data, err := c.conn.Read(context.Background())
+			if err != nil {
+				slog.Error("WebSocket read error", "socket_id", c.socketId, "error", err)
 				return
-			default:
-				msgType, data, err := c.conn.Read(context.Background())
-				if err != nil {
-					slog.Error("WebSocket read error", "socket_id", c.socketId, "error", err)
-					return
-				}
-
-				// Only handle text messages
-				if msgType == websocket.MessageText {
-					// Call the provided function for each received message
-					go fn(string(data))
-				}
+			}
+			if msgType == websocket.MessageText {
+				// Call the provided function for each received message
+				go fn(string(data))
 			}
 		}
 	}()
