@@ -32,13 +32,13 @@ func GetWebsocketManager() *WebSocketManager {
 
 // Add adds a new WebSocket client to the manager.
 // Generates UUID v4 for socketId, creates WebsocketClient instance, stores in clients map.
-func (m *WebSocketManager) Add(conn *websocket.Conn, socketId string, username string) *WebsocketClient {
+func (m *WebSocketManager) Add(conn *websocket.Conn, userId string, username string) *WebsocketClient {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	client := NewWebsocketClient(conn, socketId, username)
+	client := NewWebsocketClient(conn, userId, username)
 	m.clients[client.socketId] = client
-	slog.Info("client added", "socketId", client.socketId, "socketId", socketId, "username", username)
+	slog.Info("client added", "socketId", client.socketId, "userId", userId, "username", username)
 	return client
 }
 
@@ -48,8 +48,8 @@ func (m *WebSocketManager) Remove(socketId string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	client := m.clients[socketId]
-	if client == nil {
+	client, exists := m.clients[socketId]
+	if !exists {
 		slog.Debug("no client found for user", "socketId", socketId)
 		return
 	}
@@ -76,15 +76,16 @@ func (m *WebSocketManager) Remove(socketId string) {
 }
 
 // GetByUser searches through clients to find the client with matching socketId.
-func (m *WebSocketManager) GetByUser(socketId string) *WebsocketClient {
+func (m *WebSocketManager) GetByUser(userId string) *WebsocketClient {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	for _, client := range m.clients {
-		if client.socketId == socketId {
+		if client.userId == userId {
 			return client
 		}
 	}
+
 	return nil
 }
 
