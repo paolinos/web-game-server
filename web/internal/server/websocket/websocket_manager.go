@@ -3,8 +3,6 @@ package ws_server
 import (
 	"log/slog"
 	"sync"
-
-	"github.com/coder/websocket"
 )
 
 // WebSocketManager is a singleton manager that tracks all clients and groups, providing centralized operations.
@@ -32,7 +30,7 @@ func GetWebsocketManager() *WebSocketManager {
 
 // Add adds a new WebSocket client to the manager.
 // Generates UUID v4 for socketId, creates WebsocketClient instance, stores in clients map.
-func (m *WebSocketManager) Add(conn *websocket.Conn, userId string, username string) *WebsocketClient {
+func (m *WebSocketManager) Add(conn WebSocketConn, userId string, username string) *WebsocketClient {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -158,8 +156,8 @@ func (m *WebSocketManager) SendGroup(group string, msg string) {
 	}
 
 	for _, socketId := range users {
-		client := m.GetByUser(socketId)
-		if client != nil && client.conn != nil {
+		client := m.GetBySocket(socketId)
+		if client != nil {
 			err := client.Send(msg)
 			if err != nil {
 				slog.Debug("failed to send group message", "group", group, "socketId", socketId, "error", err)
@@ -203,6 +201,6 @@ func (m *WebSocketManager) IsUserOnline(socketId string) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	client := m.GetByUser(socketId)
+	client := m.GetBySocket(socketId)
 	return client != nil
 }
