@@ -5,12 +5,15 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Common Debug",
+            "name": "Web Debug",
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceFolder}/common/cmd/common.go",
-            "cwd": "${workspaceFolder}/common"
-        },
+            "program": "${workspaceFolder}/web/cmd/web.go",
+            "cwd": "${workspaceFolder}/web",
+            "dlvFlags": [
+                "--check-go-version=false"
+            ]
+        }
     ]
 }
