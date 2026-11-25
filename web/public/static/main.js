@@ -48,9 +48,17 @@ const connectWebSocket = (api_token) => {
         }));
     });
     ws.addEventListener("message", (event) => {
+        // Handle server ping-pong heartbeat
+        if (event.data === "ping") {
+            ws.send("pong");
+            return;
+        }
+
         try {
             const data = JSON.parse(event.data);
-            if (data.type === 'match') {
+            if (data.type === 'connected') {
+                console.log("WebSocket: connected", data.socketId);
+            } else if (data.type === 'match') {
                 console.log("WebSocket: match notification received", data);
                 // Reload dashboard to show new match
                 loadDashboard();

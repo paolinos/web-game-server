@@ -18,10 +18,10 @@ func (m *MockWebSocketConn) Write(ctx context.Context, msgType websocket.Message
 	return args.Error(0)
 }
 
-// Read mocks the Read method. It returns default values for testing.
+// Read mocks the Read method. It returns mocked values for testing.
 func (m *MockWebSocketConn) Read(ctx context.Context) (websocket.MessageType, []byte, error) {
 	args := m.Called(ctx)
-	msgType := websocket.MessageText
+	msgType := args.Get(0).(websocket.MessageType)
 	data := args.Get(1).([]byte)
 	err := args.Error(2)
 	return msgType, data, err

@@ -4,10 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
+)
+
+const (
+	pingInterval   = 15 * time.Second
+	pingTimeoutMax = 10 * time.Second
 )
 
 // WebSocketConn is an interface for WebSocket connections to enable testing
@@ -19,11 +25,16 @@ type WebSocketConn interface {
 
 // WebsocketClient represents a single WebSocket connection with methods for sending/receiving messages
 type WebsocketClient struct {
-	socketId    string        // Unique identifier for the connection (UUID v4)
-	userId      string        // User identifier from authentication
-	username    string        // Username from authentication
-	conn        WebSocketConn // Reference to the WebSocket connection (interface for testability)
-	receiveDone chan struct{} // Channel for graceful shutdown of receive routine
+	socketId     string        // Unique identifier for the connection (UUID v4)
+	userId       string        // User identifier from authentication
+	username     string        // Username from authentication
+	conn         WebSocketConn // Reference to the WebSocket connection (interface for testability)
+	receiveDone  chan struct{} // Channel for graceful shutdown of receive routine
+	done         chan struct{} // Channel closed when the client is disconnected
+	disconnected bool          // Flag to ensure Disconnect is idempotent
+	mu           sync.Mutex    // Protects conn and disconnected flag
+	pingTimeout  time.Time     // When the last ping was sent; timeout deadline
+	pingMu       sync.Mutex    // Protects pingTimeout
 }
 
 // NewWebsocketClient creates a new WebsocketClient instance with a generated socket ID
@@ -35,19 +46,23 @@ func NewWebsocketClient(conn WebSocketConn, userId string, username string) *Web
 		username:    username,
 		conn:        conn,
 		receiveDone: make(chan struct{}),
+		done:        make(chan struct{}),
 	}
 }
 
 // Send sends a string message to the WebSocket connection
 func (c *WebsocketClient) Send(msg string) error {
-	if c.conn == nil {
+	c.mu.Lock()
+	conn := c.conn
+	c.mu.Unlock()
+	if conn == nil {
 		return nil // Connection already closed
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err := c.conn.Write(ctx, websocket.MessageText, []byte(msg))
+	err := conn.Write(ctx, websocket.MessageText, []byte(msg))
 
 	if err != nil {
 		slog.Error("Failed to send message", "socket_id", c.socketId, "error", err)
@@ -57,7 +72,10 @@ func (c *WebsocketClient) Send(msg string) error {
 
 // SendJson marshals an object to JSON and sends it to the WebSocket connection
 func (c *WebsocketClient) SendJson(obj any) error {
-	if c.conn == nil {
+	c.mu.Lock()
+	conn := c.conn
+	c.mu.Unlock()
+	if conn == nil {
 		return nil // Connection already closed
 	}
 
@@ -74,21 +92,107 @@ func (c *WebsocketClient) SendJson(obj any) error {
 	return err
 }
 
+// WebsocketClientSender defines the interface for sending messages and getting socket ID
+type WebsocketClientSender interface {
+	Send(msg string) error
+	SendJson(obj any) error
+	GetSocketId() string
+}
+
+// handleText routes text messages to the internal handler with callback.
+// Pong messages are handled internally and never forwarded to the callback.
+func (c *WebsocketClient) handleText(msg string, fn func(c WebsocketClientSender, msg string)) {
+	if msg == "pong" {
+		c.pingMu.Lock()
+		c.pingTimeout = time.Time{}
+		c.pingMu.Unlock()
+		slog.Debug("Received pong", "socket_id", c.socketId)
+		return
+	}
+
+	go func(sender WebsocketClientSender, message string, callback func(c WebsocketClientSender, msg string)) {
+		// Text message handling logic here
+		// Route to callback or process internally
+		callback(sender, message)
+	}(c, msg, fn)
+}
+
+// handleBinary routes binary messages to the internal handler with callback
+func (c *WebsocketClient) handleBinary(data []byte, fn func(c WebsocketClientSender, msg string)) {
+	go func(sender WebsocketClientSender, binaryData []byte, callback func(c WebsocketClientSender, msg string)) {
+		// Binary message handling logic here
+		// Can be logged, ignored, or processed internally
+		slog.Debug("Received binary message", "socket_id", c.socketId, "length", len(binaryData))
+		// Call callback for consistency with text messages
+		callback(sender, string(binaryData))
+	}(c, data, fn)
+}
+
 // ReceiveRoutine starts a goroutine that reads messages from the WebSocket connection
 // and calls the provided function for each received message.
 // The routine stops automatically when the connection closes
-func (c *WebsocketClient) ReceiveRoutine(fn func(msg string)) {
+func (c *WebsocketClient) ReceiveRoutine(fn func(c WebsocketClientSender, msg string)) {
 	go func() {
 		defer close(c.receiveDone)
 
+		c.mu.Lock()
+		conn := c.conn
+		c.mu.Unlock()
+
+		if conn == nil {
+			return
+		}
+
 		for {
-			msgType, data, err := c.conn.Read(context.Background())
+			msgType, data, err := conn.Read(context.Background())
 			if err != nil {
 				slog.Error("WebSocket read error", "socket_id", c.socketId, "error", err)
 				return
 			}
-			if msgType == websocket.MessageText {
-				go fn(string(data))
+			switch msgType {
+			case websocket.MessageText:
+				c.handleText(string(data), fn)
+			case websocket.MessageBinary:
+				c.handleBinary(data, fn)
+			default:
+				slog.Debug("Unknown message type", "socket_id", c.socketId, "type", msgType)
+			}
+		}
+	}()
+}
+
+// PingRoutine starts a goroutine that sends periodic pings and disconnects the client
+// if a pong is not received within pingTimeoutMax after a ping was sent.
+func (c *WebsocketClient) PingRoutine() {
+	go func() {
+		ticker := time.NewTicker(pingInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-c.done:
+				return
+			case <-ticker.C:
+				c.pingMu.Lock()
+				timeout := c.pingTimeout
+				c.pingMu.Unlock()
+
+				if !timeout.IsZero() && time.Now().After(timeout) {
+					slog.Warn("Ping timeout", "socket_id", c.socketId)
+					c.Disconnect("ping timeout")
+					return
+				}
+
+				if err := c.Send("ping"); err != nil {
+					slog.Error("Failed to send ping", "socket_id", c.socketId, "error", err)
+					c.Disconnect("ping send failed")
+					return
+				}
+
+				c.pingMu.Lock()
+				c.pingTimeout = time.Now().Add(pingTimeoutMax)
+				c.pingMu.Unlock()
+				slog.Debug("Sent ping", "socket_id", c.socketId)
 			}
 		}
 	}()
@@ -97,14 +201,22 @@ func (c *WebsocketClient) ReceiveRoutine(fn func(msg string)) {
 // Disconnect closes the WebSocket connection with a reason (optional message)
 // The reason is logged but never sent to clients before disconnection.
 func (c *WebsocketClient) Disconnect(reason string) {
-	if c.conn == nil {
+	c.mu.Lock()
+	if c.disconnected {
+		c.mu.Unlock()
 		return // Connection already closed
 	}
-	err := c.conn.CloseNow()
-	if err != nil {
-		slog.Error("Failed to send JSON message", "socket_id", c.socketId, "error", err)
-	}
+	c.disconnected = true
+	close(c.done)
+	conn := c.conn
 	c.conn = nil
+	c.mu.Unlock()
+
+	if conn != nil {
+		if err := conn.CloseNow(); err != nil {
+			slog.Error("Failed to close websocket", "socket_id", c.socketId, "error", err)
+		}
+	}
 	slog.Info("Disconnecting WebSocket", "socket_id", c.socketId, "reason", reason)
 }
 

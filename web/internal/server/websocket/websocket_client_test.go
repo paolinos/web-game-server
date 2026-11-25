@@ -1,7 +1,10 @@
 package ws_server
 
 import (
+	"encoding/json"
+	"math"
 	"testing"
+	"time"
 
 	"github.com/coder/websocket"
 	"github.com/stretchr/testify/assert"
@@ -46,7 +49,7 @@ func Test_NewWebsocketClient_Send_Error(t *testing.T) {
 	t.Run("when sending a message and an error is detected, it should return the error", func(t *testing.T) {
 
 		// Mock Write to return an error when called once
-		mockWebsocket.On("Write", mock.Anything, websocket.MessageText, []byte("some message")).Return(assert.AnError).Times(0)
+		mockWebsocket.On("Write", mock.Anything, websocket.MessageText, []byte("some message")).Return(assert.AnError).Once()
 
 		err := conn.Send("some message")
 
@@ -75,33 +78,58 @@ func Test_NewWebsocketClient_SendJson_Error(t *testing.T) {
 	t.Run("when sending a JSON object that fails to marshal, it should return an error", func(t *testing.T) {
 
 		// Mock Write to never be called (since marshaling will fail first)
-		mockWebsocket.On("Write", mock.Anything, websocket.MessageText, mock.Anything).Return(nil).Times(0)
+		mockWebsocket.On("Write", mock.Anything, websocket.MessageText, mock.Anything).Return(assert.AnError).Times(0)
 
-		obj := map[string]string{"key": "value"}
-		err := conn.SendJson(obj)
+		//obj := map[string]string{}
+		err := conn.SendJson(math.NaN())
 
-		assert.Nil(t, err, "error should be nil when marshaling fails (returns nil early)")
+		var unsupportedValueErr *json.UnsupportedValueError
+		assert.ErrorAs(t, err, &unsupportedValueErr)
 	})
 }
 
 func Test_NewWebsocketClient_ReceiveRoutine(t *testing.T) {
 
 	mockWebsocket, conn := createWebsocketAndMock("user_1")
-	t.Run("when receiving a message, it should call the provided function", func(t *testing.T) {
+
+	t.Run("when receiving a text message, it should call the provided function with WebsocketClientSender", func(t *testing.T) {
 		message := "hello"
-		// Mock Read to return a text message with data
-		mockWebsocket.On("Read", mock.Anything).Return(websocket.MessageText, []byte(message), nil)
+		// Mock Read to return a text message with data, then an error to stop the routine
+		mockWebsocket.On("Read", mock.Anything).Return(websocket.MessageText, []byte(message), nil).Once()
+		mockWebsocket.On("Read", mock.Anything).Return(websocket.MessageText, []byte(""), assert.AnError).Once()
 
 		received := make(chan string, 1)
-		conn.ReceiveRoutine(func(msg string) {
+		conn.ReceiveRoutine(func(c WebsocketClientSender, msg string) {
 			received <- msg
 		})
 
 		select {
 		case recivedMsg := <-received:
 			assert.Equal(t, message, recivedMsg)
-		default:
-			//	waiting for message
+		case <-time.After(500 * time.Millisecond):
+			t.Fatal("expected to receive a message")
+		}
+	})
+
+	t.Run("when receiving a binary message, it should call the provided function with WebsocketClientSender", func(t *testing.T) {
+		binaryData := []byte{1, 2, 3, 4, 5}
+		// Create a new mock for this subtest to avoid conflicts
+		mockWebsocket2, conn2 := createWebsocketAndMock("user_2")
+		// Mock Read to return a binary message with data, then an error to stop the routine
+		mockWebsocket2.On("Read", mock.Anything).Return(websocket.MessageBinary, binaryData, nil).Once()
+		mockWebsocket2.On("Read", mock.Anything).Return(websocket.MessageText, []byte(""), assert.AnError).Once()
+
+		received := make(chan string, 1)
+		conn2.ReceiveRoutine(func(c WebsocketClientSender, msg string) {
+			// Binary messages are logged internally, but we still need to call the callback
+			received <- string(binaryData)
+		})
+
+		select {
+		case recivedMsg := <-received:
+			assert.NotNil(t, recivedMsg, "should receive a message")
+		case <-time.After(500 * time.Millisecond):
+			t.Fatal("expected to receive a message")
 		}
 	})
 }
@@ -111,20 +139,16 @@ func TestNewWebsocketClient_ReceiveRoutine_Error(t *testing.T) {
 	mockWebsocket, conn := createWebsocketAndMock("user_1")
 	t.Run("when receiving an error during read, it should stop the receive routine", func(t *testing.T) {
 
-		// TODO: remove the Once(). To review later.
-		mockWebsocket.On("Read", mock.Anything).Return(websocket.MessageText, []byte(""), assert.AnError)
-
 		received := make(chan string, 1)
-		conn.ReceiveRoutine(func(msg string) {
+		mockWebsocket.On("Read", mock.Anything).Return(websocket.MessageText, []byte(""), assert.AnError).Once()
+		conn.ReceiveRoutine(func(c WebsocketClientSender, msg string) {
 			received <- msg
 		})
 
 		select {
-		case _, ok := <-received:
-			if !ok {
-				t.Fatal("should not receive a message when read fails")
-			}
-		default:
+		case msg := <-received:
+			t.Fatalf("unexpected message received: %q", msg)
+		case <-time.After(500 * time.Millisecond):
 			// Expected: no message received, routine stopped due to error
 		}
 	})
@@ -155,5 +179,45 @@ func Test_NewWebsocketClient_Disconnect_Disconnected(t *testing.T) {
 		conn.Disconnect("force disconnection")
 
 		conn.Disconnect("try disconnect")
+	})
+}
+
+func Test_NewWebsocketClient_PongHandling(t *testing.T) {
+
+	t.Run("when receiving a pong message, it should not call the provided callback", func(t *testing.T) {
+		mockWebsocket, conn := createWebsocketAndMock("user_1")
+		// Mock Read to return a pong message, then an error to stop the routine
+		mockWebsocket.On("Read", mock.Anything).Return(websocket.MessageText, []byte("pong"), nil).Once()
+		mockWebsocket.On("Read", mock.Anything).Return(websocket.MessageText, []byte(""), assert.AnError).Once()
+
+		called := false
+		conn.ReceiveRoutine(func(c WebsocketClientSender, msg string) {
+			called = true
+		})
+
+		// Give the goroutine a moment to process
+		time.Sleep(50 * time.Millisecond)
+
+		assert.False(t, called, "callback should not be called for pong messages")
+	})
+
+	t.Run("when receiving a non-pong message, it should call the provided callback", func(t *testing.T) {
+		mockWebsocket, conn := createWebsocketAndMock("user_1")
+		message := "hello"
+		// Mock Read to return a normal text message, then an error to stop the routine
+		mockWebsocket.On("Read", mock.Anything).Return(websocket.MessageText, []byte(message), nil).Once()
+		mockWebsocket.On("Read", mock.Anything).Return(websocket.MessageText, []byte(""), assert.AnError).Once()
+
+		received := make(chan string, 1)
+		conn.ReceiveRoutine(func(c WebsocketClientSender, msg string) {
+			received <- msg
+		})
+
+		select {
+		case receivedMsg := <-received:
+			assert.Equal(t, message, receivedMsg)
+		case <-time.After(500 * time.Millisecond):
+			t.Fatal("expected to receive a message")
+		}
 	})
 }

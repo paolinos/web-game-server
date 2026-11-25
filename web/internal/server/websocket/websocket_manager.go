@@ -13,18 +13,17 @@ type WebSocketManager struct {
 }
 
 var manager *WebSocketManager
+var once sync.Once
 
 // GetWebsocketManager returns the singleton instance of WebSocketManager.
 // If not initialized, it creates a new one and returns it.
 func GetWebsocketManager() *WebSocketManager {
-	manager.mu.Lock()
-	defer manager.mu.Unlock()
-	if manager == nil {
+	once.Do(func() {
 		manager = &WebSocketManager{
 			clients: make(map[string]*WebsocketClient),
 			groups:  make(map[string][]string),
 		}
-	}
+	})
 	return manager
 }
 
@@ -106,11 +105,9 @@ func (m *WebSocketManager) SendBroadcast(msg string) {
 	m.mu.RUnlock()
 
 	for _, client := range clients {
-		if client.conn != nil {
-			err := client.Send(msg)
-			if err != nil {
-				slog.Debug("failed to broadcast message", "error", err)
-			}
+		err := client.Send(msg)
+		if err != nil {
+			slog.Debug("failed to broadcast message", "error", err)
 		}
 	}
 }
