@@ -14,7 +14,7 @@ web:
 # Run tests
 test:
 	@echo ">>> Running Web project tests..."
-	@go test ./... -v
+	@go test -race -count=1 ./... -v
 
 # Build web binary
 build:

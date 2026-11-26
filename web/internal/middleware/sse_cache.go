@@ -34,7 +34,7 @@ func (s *SseCache) Delete(userId string) {
 	if pos == -1 {
 		return
 	}
-	slices.Delete(s.data, pos, pos+1)
+	s.data = slices.Delete(s.data, pos, pos+1)
 }
 
 var SseCacheData = SseCache{

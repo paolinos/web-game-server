@@ -13,7 +13,7 @@ func GenerateRandomHex(n int, startWith *string) string {
 	}
 
 	if startWith != nil {
-		return fmt.Sprint("%s_%s", startWith, hex.EncodeToString(bytes))
+		return fmt.Sprintf("%s_%s", *startWith, hex.EncodeToString(bytes))
 	}
 
 	return hex.EncodeToString(bytes)
