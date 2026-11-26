@@ -16,6 +16,12 @@ const (
 	pingTimeoutMax = 10 * time.Second
 )
 
+// WebsocketClientConfig allows injection of ping/pong timing for testing.
+type WebsocketClientConfig struct {
+	PingInterval   time.Duration
+	PingTimeoutMax time.Duration
+}
+
 // WebSocketConn is an interface for WebSocket connections to enable testing
 type WebSocketConn interface {
 	Write(ctx context.Context, msgType websocket.MessageType, data []byte) error
@@ -25,28 +31,47 @@ type WebSocketConn interface {
 
 // WebsocketClient represents a single WebSocket connection with methods for sending/receiving messages
 type WebsocketClient struct {
-	socketId     string        // Unique identifier for the connection (UUID v4)
-	userId       string        // User identifier from authentication
-	username     string        // Username from authentication
-	conn         WebSocketConn // Reference to the WebSocket connection (interface for testability)
-	receiveDone  chan struct{} // Channel for graceful shutdown of receive routine
-	done         chan struct{} // Channel closed when the client is disconnected
-	disconnected bool          // Flag to ensure Disconnect is idempotent
-	mu           sync.Mutex    // Protects conn and disconnected flag
-	pingTimeout  time.Time     // When the last ping was sent; timeout deadline
-	pingMu       sync.Mutex    // Protects pingTimeout
+	socketId       string        // Unique identifier for the connection (UUID v4)
+	userId         string        // User identifier from authentication
+	username       string        // Username from authentication
+	conn           WebSocketConn // Reference to the WebSocket connection (interface for testability)
+	receiveDone    chan struct{} // Channel for graceful shutdown of receive routine
+	done           chan struct{} // Channel closed when the client is disconnected
+	disconnected   bool          // Flag to ensure Disconnect is idempotent
+	mu             sync.Mutex    // Protects conn and disconnected flag
+	pingTimeout    time.Time     // When the last ping was sent; timeout deadline
+	pingMu         sync.Mutex    // Protects pingTimeout
+	pingInterval   time.Duration // Interval between ping messages
+	pingTimeoutMax time.Duration // Max time to wait for a pong after a ping
 }
 
 // NewWebsocketClient creates a new WebsocketClient instance with a generated socket ID
 func NewWebsocketClient(conn WebSocketConn, userId string, username string) *WebsocketClient {
+	return NewWebsocketClientWithConfig(conn, userId, username, WebsocketClientConfig{})
+}
+
+// NewWebsocketClientWithConfig creates a new WebsocketClient with configurable ping/pong timing.
+func NewWebsocketClientWithConfig(conn WebSocketConn, userId string, username string, config WebsocketClientConfig) *WebsocketClient {
 	socketId := uuid.New().String()
+
+	pi := config.PingInterval
+	if pi <= 0 {
+		pi = pingInterval
+	}
+	ptm := config.PingTimeoutMax
+	if ptm <= 0 {
+		ptm = pingTimeoutMax
+	}
+
 	return &WebsocketClient{
-		socketId:    socketId,
-		userId:      userId,
-		username:    username,
-		conn:        conn,
-		receiveDone: make(chan struct{}),
-		done:        make(chan struct{}),
+		socketId:       socketId,
+		userId:         userId,
+		username:       username,
+		conn:           conn,
+		receiveDone:    make(chan struct{}),
+		done:           make(chan struct{}),
+		pingInterval:   pi,
+		pingTimeoutMax: ptm,
 	}
 }
 
@@ -92,11 +117,13 @@ func (c *WebsocketClient) SendJson(obj any) error {
 	return err
 }
 
-// WebsocketClientSender defines the interface for sending messages and getting socket ID
+// WebsocketClientSender defines the interface for sending messages and identifying the client.
 type WebsocketClientSender interface {
 	Send(msg string) error
 	SendJson(obj any) error
 	GetSocketId() string
+	GetUserId() string
+	GetUsername() string
 }
 
 // handleText routes text messages to the internal handler with callback.
@@ -165,7 +192,7 @@ func (c *WebsocketClient) ReceiveRoutine(fn func(c WebsocketClientSender, msg st
 // if a pong is not received within pingTimeoutMax after a ping was sent.
 func (c *WebsocketClient) PingRoutine() {
 	go func() {
-		ticker := time.NewTicker(pingInterval)
+		ticker := time.NewTicker(c.pingInterval)
 		defer ticker.Stop()
 
 		for {
@@ -190,7 +217,7 @@ func (c *WebsocketClient) PingRoutine() {
 				}
 
 				c.pingMu.Lock()
-				c.pingTimeout = time.Now().Add(pingTimeoutMax)
+				c.pingTimeout = time.Now().Add(c.pingTimeoutMax)
 				c.pingMu.Unlock()
 				slog.Debug("Sent ping", "socket_id", c.socketId)
 			}
@@ -223,4 +250,14 @@ func (c *WebsocketClient) Disconnect(reason string) {
 // GetSocketId returns the socket ID for this client
 func (c *WebsocketClient) GetSocketId() string {
 	return c.socketId
+}
+
+// GetUserId returns the user ID for this client
+func (c *WebsocketClient) GetUserId() string {
+	return c.userId
+}
+
+// GetUsername returns the username for this client
+func (c *WebsocketClient) GetUsername() string {
+	return c.username
 }

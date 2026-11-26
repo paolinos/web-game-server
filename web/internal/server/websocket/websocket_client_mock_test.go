@@ -34,7 +34,11 @@ func (m *MockWebSocketConn) CloseNow() error {
 }
 
 func createWebsocketAndMock(userId string) (*MockWebSocketConn, *WebsocketClient) {
+	return createWebsocketAndMockWithConfig(userId, WebsocketClientConfig{})
+}
+
+func createWebsocketAndMockWithConfig(userId string, config WebsocketClientConfig) (*MockWebSocketConn, *WebsocketClient) {
 	mockWebsocket := new(MockWebSocketConn)
-	conn := NewWebsocketClient(mockWebsocket, userId, userId+"_username")
+	conn := NewWebsocketClientWithConfig(mockWebsocket, userId, userId+"_username", config)
 	return mockWebsocket, conn
 }

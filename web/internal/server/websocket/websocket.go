@@ -99,4 +99,11 @@ func messageHandler(c WebsocketClientSender, msg string) {
 	}
 
 	slog.Info("parsed websocket message", "socket_id", c.GetSocketId(), "type", msgType)
+
+	switch msgType {
+	case MessageTypeMatchSearch:
+		HandleMatchSearch(c, msg)
+	default:
+		slog.Debug("unhandled websocket message type", "socket_id", c.GetSocketId(), "type", msgType)
+	}
 }

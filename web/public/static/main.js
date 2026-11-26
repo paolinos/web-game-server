@@ -1,94 +1,5 @@
 const SERVER_HOST = "http://localhost:8000";
 const API_HOST = `${SERVER_HOST}/api`;
-let api_token = undefined;
-let ws = null; // WebSocket connection
-
-/**
- * Call API
- * @param {string} path
- * @param {string} method
- * @param {Object|undefined} body
- * @returns {Object}
- */
-const callApi = async (path, method, body = undefined) => {
-    const headers = {
-        "Content-Type": "application/json"
-    };
-    if (api_token) {
-        headers["Authorization"] = api_token;
-    }
-    const response = await fetch(`${API_HOST}/${path}`, {
-        method,
-        headers,
-        body: body ? JSON.stringify(body) : undefined
-    });
-
-    const bodyResult = await response.json();
-    if (response.status < 200 || response.status >= 400) {
-        const err = `Error trying to call ${path}.${bodyResult.error || ""}`;
-        console.error(err);
-        throw new Error(err);
-    }
-    return bodyResult;
-}
-
-/**
- * Establish WebSocket connection for real-time notifications
- */
-const connectWebSocket = (api_token) => {
-    if (!api_token) {
-        console.log("WebSocket: no token, cannot connect");
-        return;
-    }
-
-    ws = new WebSocket(`${SERVER_HOST}/ws`);
-    ws.addEventListener("open", (event) => {
-        ws.send(JSON.stringify({
-            "token":api_token
-        }));
-    });
-    ws.addEventListener("message", (event) => {
-        // Handle server ping-pong heartbeat
-        if (event.data === "ping") {
-            ws.send("pong");
-            return;
-        }
-
-        try {
-            const data = JSON.parse(event.data);
-            if (data.type === 'connected') {
-                console.log("WebSocket: connected", data.socketId);
-            } else if (data.type === 'match') {
-                console.log("WebSocket: match notification received", data);
-                // Reload dashboard to show new match
-                loadDashboard();
-            } else if (data.type === 'error') {
-                console.error("WebSocket error:", data.message);
-            }
-        } catch (e) {
-            console.error("WebSocket: failed to parse message", e, event.data);
-        }
-    });
-
-    ws.addEventListener("close", () => {
-        console.log("WebSocket: disconnected");
-        ws = null;
-    })
-    ws.addEventListener("error", (error) => {
-        console.error("WebSocket error:", error);
-        ws = null;
-    });
-};
-
-/**
- * Close WebSocket connection
- */
-const disconnectWebSocket = () => {
-    if (ws) {
-        ws.close();
-        ws = null;
-    }
-};
 
 const LOGIN_VIEW = "loginSection";
 const HOME_VIEW = "homeSection";
@@ -123,8 +34,8 @@ const ViewManager = (() => {
                     view.cb();
                 }
                 if (view.element.id === LOGIN_VIEW) {
-                    view.element.style.removeProperty('display'); 
-                }else {
+                    view.element.style.removeProperty('display');
+                } else {
                     view.element.style.display = "block";
                 }
                 _activeView = view;
@@ -148,10 +59,22 @@ createApp({
             api_token: undefined,
             isLoggedIn: false,
             rightPanelVisible: false,
-            matches: []
+            matches: [],
+            ws: null,
+            socketId: null,
+            email: "",
+            username: "",
+            reconnectAttempts: 0,
+            maxReconnectAttempts: 5,
+            baseReconnectDelay: 1000
         };
     },
     methods: {
+        showError(message) {
+            console.error(message);
+            alert(message);
+        },
+
         async callApi(path, method, body = undefined) {
             const headers = { "Content-Type": "application/json" };
             if (this.api_token) {
@@ -171,38 +94,47 @@ createApp({
         },
 
         async signin() {
-            const email = document.getElementById("txtEmail").value;
-            const username = document.getElementById("txtUsername").value;
-
-            if (!email || !username) {
-                alert("Please enter both email and username");
+            if (!this.email || !this.username) {
+                this.showError("Please enter both email and username");
                 return;
             }
 
             try {
-                const {token} = await this.callApi("signin", "POST", { email, username })
+                const { token } = await this.callApi("signin", "POST", {
+                    email: this.email,
+                    username: this.username
+                });
                 this.api_token = token;
                 this.isLoggedIn = true;
-                
-                // Connect WebSocket for real-time notifications
-                connectWebSocket(token);
-                
+
+                this.connectWebSocket(token);
                 await this.loadDashboard();
                 ViewManager.loadView(HOME_VIEW);
             } catch (err) {
-                console.error("Signin failed:", err);
+                this.showError("Signin failed: " + err.message);
             }
         },
 
         async loadDashboard() {
-            const data = await this.callApi("dashboard", "GET")
-            document.getElementById("lblHomeUsername").textContent = data.username;
-            document.getElementById("lblHomePoints").textContent = `${data.points} Points`;
+            const data = await this.callApi("dashboard", "GET");
+
+            const lblHomeUsername = document.getElementById("lblHomeUsername");
+            if (lblHomeUsername) {
+                lblHomeUsername.textContent = data.username;
+            }
+
+            const lblHomePoints = document.getElementById("lblHomePoints");
+            if (lblHomePoints) {
+                lblHomePoints.textContent = `${data.points} Points`;
+            }
 
             this.matches = data.matches || [];
             const dashboardBody = document.getElementById("dashboardBody");
-            dashboardBody.innerHTML = "";
+            if (!dashboardBody) {
+                return;
+            }
 
+            dashboardBody.innerHTML = "";
             for (const match of this.matches) {
                 const tr = document.createElement("tr");
                 tr.innerHTML = `
@@ -214,28 +146,16 @@ createApp({
             }
         },
 
-        async searchMatch() {
-            //! TODO: if we want a token we need to ask fist and then call
-            const evtSource = new EventSource(`${API_HOST}/match-notification?tmp=${txtEmail.value}`);
-            evtSource.addEventListener("notice", (e) => {
-                //! TO DELETE
-                console.log("SSE notice:", e); 
-            });
-            evtSource.addEventListener("update", (e) => {
-                //! TO DELETE
-                console.log("SSE update:", e);
-            });
+        searchMatch() {
+            if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+                this.showError("WebSocket is not connected. Please sign in again.");
+                return;
+            }
 
-            evtSource.addEventListener("message", (e) => {
-                console.log("SSE Message:", e, "now:", Date.now())
-                evtSource.close()
-            });
-            evtSource.onerror = (err) => {
-                console.error("SSE failed:", err);
-                evtSource.close()
-            };
-
-            const data = await this.callApi("search-match", "POST", {game: "TIC-TAC-TOE"});
+            this.ws.send(JSON.stringify({
+                type: "match.search",
+                game: "TIC-TAC-TOE"
+            }));
         },
 
         toggleRightPanel() {
@@ -250,15 +170,105 @@ createApp({
             this.api_token = undefined;
             this.isLoggedIn = false;
             this.rightPanelVisible = false;
+            this.email = "";
+            this.username = "";
+            this.socketId = null;
             ViewManager.closeRightPanel();
             ViewManager.loadView(LOGIN_VIEW);
+            this.disconnectWebSocket();
+        },
 
-            // Clear form
-            document.getElementById("txtEmail").value = "";
-            document.getElementById("txtUsername").value = "";
+        connectWebSocket(token) {
+            if (!token) {
+                console.log("WebSocket: no token, cannot connect");
+                return;
+            }
 
-            // Disconnect WebSocket
-            disconnectWebSocket();
+            if (this.ws) {
+                this.disconnectWebSocket();
+            }
+
+            try {
+                this.ws = new WebSocket(`${SERVER_HOST}/ws`);
+            } catch (err) {
+                this.showError("Failed to create WebSocket: " + err.message);
+                return;
+            }
+
+            this.ws.addEventListener("open", () => {
+                this.ws.send(JSON.stringify({ token }));
+            });
+
+            this.ws.addEventListener("message", (event) => {
+                // Handle server ping-pong heartbeat
+                if (event.data === "ping") {
+                    this.ws.send("pong");
+                    return;
+                }
+
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'connected') {
+                        this.socketId = data.socketId;
+                        this.reconnectAttempts = 0;
+                        console.log("WebSocket: connected", data.socketId);
+                    } else if (data.type === 'match') {
+                        console.log("WebSocket: match notification received", data);
+                        this.loadDashboard();
+                        ViewManager.loadView(GAME_VIEW);
+                    } else if (data.type === 'match.search.waiting') {
+                        console.log("WebSocket: waiting for match", data);
+                    } else if (data.type === 'error') {
+                        this.showError("Server error: " + data.message);
+                    }
+                } catch (e) {
+                    console.error("WebSocket: failed to parse message", e, event.data);
+                }
+            });
+
+            this.ws.addEventListener("close", () => {
+                console.log("WebSocket: disconnected");
+                this.ws = null;
+                this.socketId = null;
+                this.attemptReconnect();
+            });
+
+            this.ws.addEventListener("error", (error) => {
+                console.error("WebSocket error:", error);
+                this.showError("WebSocket connection error");
+            });
+        },
+
+        attemptReconnect() {
+            if (!this.isLoggedIn || !this.api_token) {
+                return;
+            }
+            if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                this.showError("WebSocket: max reconnection attempts reached");
+                return;
+            }
+
+            this.reconnectAttempts++;
+            const delay = Math.min(
+                this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts),
+                30000
+            );
+            console.log(`WebSocket: reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
+
+            setTimeout(() => {
+                if (this.isLoggedIn && this.api_token) {
+                    this.connectWebSocket(this.api_token);
+                }
+            }, delay);
+        },
+
+        disconnectWebSocket() {
+            this.reconnectAttempts = this.maxReconnectAttempts; // prevent auto-reconnect
+            if (this.ws) {
+                this.ws.close();
+                this.ws = null;
+            }
+            this.socketId = null;
         }
     },
 
@@ -269,22 +279,19 @@ createApp({
             btnSignin.addEventListener("click", () => this.signin());
         }
 
-        const txtEmail = document.getElementById("txtEmail");
-        const txtUsername = document.getElementById("txtUsername");
-
         const btnHomeMatch = document.getElementById("btnHomeMatch");
         if (btnHomeMatch) {
-            btnHomeMatch.addEventListener("click", this.searchMatch);
+            btnHomeMatch.addEventListener("click", () => this.searchMatch());
         }
 
         const btnHamburger = document.getElementById("btnHamburger");
         if (btnHamburger) {
-            btnHamburger.addEventListener("click", this.toggleRightPanel);
+            btnHamburger.addEventListener("click", () => this.toggleRightPanel());
         }
 
         const btnLogout = document.getElementById("btnLogout");
         if (btnLogout) {
-            btnLogout.addEventListener("click", this.logout);
+            btnLogout.addEventListener("click", () => this.logout());
         }
 
         // Initialize view manager
@@ -302,7 +309,7 @@ createApp({
 
         // Clean up WebSocket on page unload
         window.addEventListener('beforeunload', () => {
-            disconnectWebSocket();
+            this.disconnectWebSocket();
         });
     }
 }).mount("#loginSection");

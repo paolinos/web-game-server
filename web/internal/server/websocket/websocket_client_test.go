@@ -221,3 +221,82 @@ func Test_NewWebsocketClient_PongHandling(t *testing.T) {
 		}
 	})
 }
+
+func Test_NewWebsocketClient_PingRoutine(t *testing.T) {
+
+	t.Run("when ping interval elapses, it should send a ping", func(t *testing.T) {
+		mockWebsocket, conn := createWebsocketAndMockWithConfig("user_1", WebsocketClientConfig{
+			PingInterval:   30 * time.Millisecond,
+			PingTimeoutMax: 100 * time.Millisecond,
+		})
+
+		pingSent := make(chan struct{}, 1)
+		mockWebsocket.On("Write", mock.Anything, websocket.MessageText, []byte("ping")).Return(nil).Once().Run(func(args mock.Arguments) {
+			pingSent <- struct{}{}
+		})
+		mockWebsocket.On("CloseNow").Return(nil).Once()
+
+		conn.PingRoutine()
+
+		select {
+		case <-pingSent:
+			// expected
+		case <-time.After(500 * time.Millisecond):
+			t.Fatal("expected a ping to be sent")
+		}
+
+		conn.Disconnect("test end")
+
+		select {
+		case <-conn.done:
+			// expected
+		case <-time.After(500 * time.Millisecond):
+			t.Fatal("expected client to disconnect")
+		}
+
+		mockWebsocket.AssertExpectations(t)
+	})
+
+	t.Run("when pong is not received within timeout, it should disconnect", func(t *testing.T) {
+		mockWebsocket, conn := createWebsocketAndMockWithConfig("user_1", WebsocketClientConfig{
+			PingInterval:   40 * time.Millisecond,
+			PingTimeoutMax: 10 * time.Millisecond,
+		})
+
+		mockWebsocket.On("Write", mock.Anything, websocket.MessageText, []byte("ping")).Return(nil).Once()
+		mockWebsocket.On("CloseNow").Return(nil).Once()
+
+		conn.PingRoutine()
+
+		select {
+		case <-conn.done:
+			// expected
+		case <-time.After(500 * time.Millisecond):
+			t.Fatal("expected client to disconnect due to ping timeout")
+		}
+
+		mockWebsocket.AssertExpectations(t)
+	})
+
+	t.Run("when receiving a pong, it should clear the ping timeout", func(t *testing.T) {
+		mockWebsocket, conn := createWebsocketAndMockWithConfig("user_1", WebsocketClientConfig{
+			PingInterval:   100 * time.Millisecond,
+			PingTimeoutMax: 50 * time.Millisecond,
+		})
+
+		// Set a pending timeout to verify it is cleared by the pong.
+		conn.pingTimeout = time.Now().Add(time.Hour)
+
+		mockWebsocket.On("Read", mock.Anything).Return(websocket.MessageText, []byte("pong"), nil).Once()
+		mockWebsocket.On("Read", mock.Anything).Return(websocket.MessageText, []byte(""), assert.AnError).Once()
+		mockWebsocket.On("CloseNow").Return(nil).Once()
+
+		conn.ReceiveRoutine(func(c WebsocketClientSender, msg string) {})
+
+		time.Sleep(50 * time.Millisecond)
+
+		assert.True(t, conn.pingTimeout.IsZero(), "pong should clear ping timeout")
+
+		conn.Disconnect("test end")
+	})
+}
