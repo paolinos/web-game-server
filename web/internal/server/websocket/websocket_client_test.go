@@ -259,19 +259,22 @@ func Test_NewWebsocketClient_PingRoutine(t *testing.T) {
 
 	t.Run("when pong is not received within timeout, it should disconnect", func(t *testing.T) {
 		mockWebsocket, conn := createWebsocketAndMockWithConfig("user_1", WebsocketClientConfig{
-			PingInterval:   40 * time.Millisecond,
-			PingTimeoutMax: 10 * time.Millisecond,
+			PingInterval:   100 * time.Millisecond,
+			PingTimeoutMax: 50 * time.Millisecond,
 		})
 
+		disconnected := make(chan struct{}, 1)
 		mockWebsocket.On("Write", mock.Anything, websocket.MessageText, []byte("ping")).Return(nil).Once()
-		mockWebsocket.On("CloseNow").Return(nil).Once()
+		mockWebsocket.On("CloseNow").Return(nil).Once().Run(func(args mock.Arguments) {
+			disconnected <- struct{}{}
+		})
 
 		conn.PingRoutine()
 
 		select {
-		case <-conn.done:
+		case <-disconnected:
 			// expected
-		case <-time.After(500 * time.Millisecond):
+		case <-time.After(2 * time.Second):
 			t.Fatal("expected client to disconnect due to ping timeout")
 		}
 

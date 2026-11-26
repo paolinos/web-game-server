@@ -11,10 +11,9 @@ import (
 )
 
 func setupMatchmakingTest(t *testing.T) *db.MatchmakingRepository {
-	ctx := db.GetDbContext()
-	originalMatchmakingRepo := ctx.MatchmakingRepo
-
-	ctx.MatchmakingRepo = db.MatchmakingRepository{}
+	if err := db.InitDb(":memory:"); err != nil {
+		t.Fatalf("failed to init db: %v", err)
+	}
 
 	// Ensure the singleton's sync.Once has fired before we replace the manager,
 	// otherwise GetWebsocketManager() called by the handler will overwrite it.
@@ -22,10 +21,11 @@ func setupMatchmakingTest(t *testing.T) *db.MatchmakingRepository {
 	manager = createManager()
 
 	t.Cleanup(func() {
-		ctx.MatchmakingRepo = originalMatchmakingRepo
+		ctx := db.GetDbContext()
+		_ = ctx.DB.Close()
 	})
 
-	return &ctx.MatchmakingRepo
+	return &db.GetDbContext().MatchmakingRepo
 }
 
 type mockSender struct {
@@ -96,6 +96,9 @@ func TestHandleMatchSearch(t *testing.T) {
 	t.Run("Given no waiting match, when HandleMatchSearch is called, then it creates a lobby and sends a waiting message", func(t *testing.T) {
 		repo := setupMatchmakingTest(t)
 
+		_, err := db.GetDbContext().UserRepo.Add("user-1", "user1@test.com", "user1", "token-1")
+		assert.NoError(t, err)
+
 		sender := &mockSender{socketId: "socket-1", userId: "user-1", username: "user1"}
 		sender.On("SendJson", mock.Anything).Return(nil).Once()
 
@@ -104,7 +107,8 @@ func TestHandleMatchSearch(t *testing.T) {
 		sender.AssertExpectations(t)
 		assertMessageType(t, sender.Calls[0].Arguments[0], "match.search.waiting")
 
-		match := repo.GetByGameAndWaiting("TIC-TAC-TOE")
+		match, err := repo.GetByGameAndWaiting("TIC-TAC-TOE")
+		assert.NoError(t, err)
 		assert.NotNil(t, match)
 		assert.Equal(t, []string{"user-1"}, match.PlayersId)
 	})
@@ -112,9 +116,16 @@ func TestHandleMatchSearch(t *testing.T) {
 	t.Run("Given a waiting match, when a second player searches, then it fills the lobby and notifies both players", func(t *testing.T) {
 		repo := setupMatchmakingTest(t)
 
+		_, err := db.GetDbContext().UserRepo.Add("user-1", "user1@test.com", "user1", "token-1")
+		assert.NoError(t, err)
+		_, err = db.GetDbContext().UserRepo.Add("user-2", "user2@test.com", "user2", "token-2")
+		assert.NoError(t, err)
+
 		// First player creates the lobby.
-		repo.Add("TIC-TAC-TOE", []string{"user-1"})
-		m := repo.GetByGameAndWaiting("TIC-TAC-TOE")
+		_, err = repo.Add("TIC-TAC-TOE", []string{"user-1"})
+		assert.NoError(t, err)
+		m, err := repo.GetByGameAndWaiting("TIC-TAC-TOE")
+		assert.NoError(t, err)
 		assert.NotNil(t, m, "lobby should be waiting")
 
 		// Mock clients for both players in the manager.
@@ -139,7 +150,8 @@ func TestHandleMatchSearch(t *testing.T) {
 			assertMessageType(t, mockConn2.Calls[0].Arguments[2], "match")
 		}
 
-		match := repo.GetByGameAndWaiting("TIC-TAC-TOE")
+		match, err := repo.GetByGameAndWaiting("TIC-TAC-TOE")
+		assert.NoError(t, err)
 		assert.Nil(t, match)
 
 		manager.Remove(player1.socketId)

@@ -34,7 +34,11 @@ func AuthMiddleware() echo.MiddlewareFunc {
 			}
 
 			db := dbpk.GetDbContext()
-			userData := db.UserRepo.GetByToken(token)
+			userData, err := db.UserRepo.GetByToken(token)
+			if err != nil {
+				slog.Error("Middleware: Failed to query user by token", "error", err)
+				return httpherlper.ErrorJsonResponse(c, http.StatusInternalServerError, lang.ERROR_UNEXPECTED)
+			}
 			if userData == nil {
 				slog.Debug("Middleware: Token not found")
 

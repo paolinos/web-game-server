@@ -1,33 +1,54 @@
 package db
 
 import (
-	"paolinos/web-game-server/web/internal/models"
+	"database/sql"
 	"time"
+
+	"github.com/google/uuid"
+	"paolinos/web-game-server/web/internal/models"
 )
 
 type SseListeningRepository struct {
-	Repository[models.SseListening]
+	db *sql.DB
 }
 
-func (s *SseListeningRepository) GetByUserId(userId string) *models.SseListening {
+func (s *SseListeningRepository) GetByUserId(userId string) (*models.SseListening, error) {
+	row := s.db.QueryRow(`SELECT user_id, updated_at FROM USER_SESSION WHERE user_id = ?`, userId)
 
-	return s.getBy(func(c models.SseListening) bool {
-		return c.UserId == userId
-	})
+	var listening models.SseListening
+	err := row.Scan(&listening.UserId, &listening.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &listening, nil
 }
 
-func (s *SseListeningRepository) Add(userId string) models.SseListening {
-
+func (s *SseListeningRepository) Add(userId string) (*models.SseListening, error) {
 	data := models.SseListening{
 		UserId:    userId,
 		UpdatedAt: time.Now().Unix(),
 	}
 
-	s.add(data)
+	id, err := uuid.NewUUID()
+	if err != nil {
+		return nil, err
+	}
 
-	return data
+	_, err = s.db.Exec(
+		`INSERT INTO USER_SESSION (id, user_id, token, expire_at) VALUES (?, ?, ?, ?)`,
+		id.String(), userId, id.String(), 0,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &data, nil
 }
 
-func (s *SseListeningRepository) Delete(userId string) {
-	s.delete(func(sl models.SseListening) bool { return sl.UserId == userId })
+func (s *SseListeningRepository) Delete(userId string) error {
+	_, err := s.db.Exec(`DELETE FROM USER_SESSION WHERE user_id = ?`, userId)
+	return err
 }

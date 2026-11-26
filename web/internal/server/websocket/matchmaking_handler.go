@@ -57,10 +57,26 @@ func HandleMatchSearch(sender WebsocketClientSender, raw string) {
 		return
 	}
 
-	match := dbCtx.MatchmakingRepo.GetByGameAndWaiting(msg.Game)
+	match, err := dbCtx.MatchmakingRepo.GetByGameAndWaiting(msg.Game)
+	if err != nil {
+		slog.Error("failed to query matchmaking", "error", err)
+		_ = sender.SendJson(map[string]any{
+			"type":    "error",
+			"message": "failed to search for match",
+		})
+		return
+	}
 
 	if match == nil {
-		dbCtx.MatchmakingRepo.Add(msg.Game, []string{userId})
+		_, err := dbCtx.MatchmakingRepo.Add(msg.Game, []string{userId})
+		if err != nil {
+			slog.Error("failed to create match lobby", "error", err)
+			_ = sender.SendJson(map[string]any{
+				"type":    "error",
+				"message": "failed to create match lobby",
+			})
+			return
+		}
 		_ = sender.SendJson(map[string]any{
 			"type":    "match.search.waiting",
 			"game":    msg.Game,
@@ -78,11 +94,25 @@ func HandleMatchSearch(sender WebsocketClientSender, raw string) {
 		}
 	}
 	if !alreadyInLobby {
-		dbCtx.MatchmakingRepo.UpdatePlayers(match, userId)
+		if err := dbCtx.MatchmakingRepo.UpdatePlayers(match, userId); err != nil {
+			slog.Error("failed to join match lobby", "error", err)
+			_ = sender.SendJson(map[string]any{
+				"type":    "error",
+				"message": "failed to join match lobby",
+			})
+			return
+		}
 	}
 
 	if len(match.PlayersId) == int(match.RequiredPlayers) {
-		dbCtx.MatchmakingRepo.UpdateStatus(match, models.MATCHMAKING_STATUS_IN_PROGRESS)
+		if err := dbCtx.MatchmakingRepo.UpdateStatus(match, models.MATCHMAKING_STATUS_IN_PROGRESS); err != nil {
+			slog.Error("failed to update match status", "error", err)
+			_ = sender.SendJson(map[string]any{
+				"type":    "error",
+				"message": "failed to start match",
+			})
+			return
+		}
 
 		notification := MatchFoundMessage{
 			Type:         MessageTypeMatchFound,

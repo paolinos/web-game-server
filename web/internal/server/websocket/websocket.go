@@ -47,7 +47,12 @@ func WebsocketHandler(c *echo.Context) error {
 	}
 
 	// Check Token validation
-	user := db.GetDbContext().UserRepo.GetByToken(auth.Token)
+	user, err := db.GetDbContext().UserRepo.GetByToken(auth.Token)
+	if err != nil {
+		slog.Error("failed to query user by token", "error", err)
+		_ = conn.Close(websocket.StatusInternalError, "internal error")
+		return nil
+	}
 	if user == nil || user.Token != auth.Token {
 		slog.Warn("invalid auth code")
 

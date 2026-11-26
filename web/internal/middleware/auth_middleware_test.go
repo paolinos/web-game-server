@@ -12,28 +12,24 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func setupAuthMiddlewareTest() (*echo.Echo, db.UserRepository, func()) {
+func setupAuthMiddlewareTest(t *testing.T) (*echo.Echo, func()) {
 	e := echo.New()
 
-	ctx := db.GetDbContext()
-	originalUserRepo := ctx.UserRepo
-
-	userRepo := db.UserRepository{}
-	userRepo.Add("user-id-1", "test@example.com", "test-user", "valid-token")
-
-	ctx.UserRepo = userRepo
-
-	cleanup := func() {
-		ctx.UserRepo = originalUserRepo
+	if err := db.InitDb(":memory:"); err != nil {
+		t.Fatalf("failed to init db: %v", err)
 	}
 
-	return e, userRepo, cleanup
+	t.Cleanup(func() {
+		ctx := db.GetDbContext()
+		_ = ctx.DB.Close()
+	})
+
+	return e, func() {}
 }
 
 func TestAuthMiddleware(t *testing.T) {
 	t.Run("Given a request without an Authorization header, when AuthMiddleware runs, then it returns 401 Unauthorized", func(t *testing.T) {
-		e, _, cleanup := setupAuthMiddlewareTest()
-		defer cleanup()
+		e, _ := setupAuthMiddlewareTest(t)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/dashboard", nil)
 		rec := httptest.NewRecorder()
@@ -53,8 +49,7 @@ func TestAuthMiddleware(t *testing.T) {
 	})
 
 	t.Run("Given a request with an invalid Authorization token, when AuthMiddleware runs, then it returns 401 Unauthorized", func(t *testing.T) {
-		e, _, cleanup := setupAuthMiddlewareTest()
-		defer cleanup()
+		e, _ := setupAuthMiddlewareTest(t)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/dashboard", nil)
 		req.Header.Set("Authorization", "invalid-token")
@@ -75,8 +70,10 @@ func TestAuthMiddleware(t *testing.T) {
 	})
 
 	t.Run("Given a request with a valid Authorization token, when AuthMiddleware runs, then it sets the user data and calls the next handler", func(t *testing.T) {
-		e, _, cleanup := setupAuthMiddlewareTest()
-		defer cleanup()
+		e, _ := setupAuthMiddlewareTest(t)
+
+		_, err := db.GetDbContext().UserRepo.Add("user-id-1", "test@example.com", "test-user", "valid-token")
+		assert.NoError(t, err)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/dashboard", nil)
 		req.Header.Set("Authorization", "valid-token")
@@ -89,7 +86,7 @@ func TestAuthMiddleware(t *testing.T) {
 			return c.String(http.StatusOK, "ok")
 		}
 
-		err := AuthMiddleware()(next)(c)
+		err = AuthMiddleware()(next)(c)
 
 		assert.NoError(t, err)
 		assert.True(t, nextCalled, "next handler should be called")

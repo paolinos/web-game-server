@@ -36,17 +36,27 @@ func signinRoute(c *echo.Context) error {
 	}
 
 	db := dbpk.GetDbContext()
-	data := db.UserRepo.GetByEmail(requestBody.Email)
+	data, err := db.UserRepo.GetByEmail(requestBody.Email)
+	if err != nil {
+		slog.Error("Signin: failed to query user", "error", err)
+		return httpherlper.ErrorJsonResponse(c, http.StatusInternalServerError, lang.ERROR_UNEXPECTED)
+	}
+
 	if data != nil {
 		data.CreateAt = time.Now().UTC().String()
 		data.Token = "update token" + data.CreateAt
-
+		if err := db.UserRepo.UpdateToken(data); err != nil {
+			slog.Error("Signin: failed to update token", "error", err)
+			return httpherlper.ErrorJsonResponse(c, http.StatusInternalServerError, lang.ERROR_UNEXPECTED)
+		}
 	} else {
-
 		id, _ := uuid.NewUUID()
 		tk := "tk"
-		tmp := db.UserRepo.Add(id.String(), requestBody.Email, requestBody.Username, helpers.GenerateRandomHex(25, &tk))
-		data = &tmp
+		data, err = db.UserRepo.Add(id.String(), requestBody.Email, requestBody.Username, helpers.GenerateRandomHex(25, &tk))
+		if err != nil {
+			slog.Error("Signin: failed to create user", "error", err)
+			return httpherlper.ErrorJsonResponse(c, http.StatusInternalServerError, lang.ERROR_UNEXPECTED)
+		}
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{
@@ -98,25 +108,46 @@ func searchMatchRoute(c *echo.Context) error {
 	}
 
 	db := dbpk.GetDbContext()
-	p := db.SseListeningRepo.GetByUserId(player.Id)
+	p, err := db.SseListeningRepo.GetByUserId(player.Id)
+	if err != nil {
+		slog.Error("SearchMatchRoute: failed to query SSE listening", "error", err)
+		return httpherlper.ErrorJsonResponse(c, http.StatusInternalServerError, lang.ERROR_UNEXPECTED)
+	}
 	if p == nil {
 		slog.Debug("SearchMatchRoute: Player is not listening for SSE")
 		return httpherlper.ErrorJsonResponse(c, http.StatusBadRequest, lang.VALIDATION_USER_NOT_LISTENING_SSE)
 	}
 
-	match := db.MatchmakingRepo.GetByGameAndWaiting(matchmakingBody.Game)
+	match, err := db.MatchmakingRepo.GetByGameAndWaiting(matchmakingBody.Game)
+	if err != nil {
+		slog.Error("SearchMatchRoute: failed to query matchmaking", "error", err)
+		return httpherlper.ErrorJsonResponse(c, http.StatusInternalServerError, lang.ERROR_UNEXPECTED)
+	}
 
 	if match == nil {
-		tmp := db.MatchmakingRepo.Add(matchmakingBody.Game, []string{player.Id})
-		match = &tmp
+		match, err = db.MatchmakingRepo.Add(matchmakingBody.Game, []string{player.Id})
+		if err != nil {
+			slog.Error("SearchMatchRoute: failed to create match", "error", err)
+			return httpherlper.ErrorJsonResponse(c, http.StatusInternalServerError, lang.ERROR_UNEXPECTED)
+		}
 	} else {
-		db.MatchmakingRepo.UpdatePlayers(match, player.Id)
+		if err := db.MatchmakingRepo.UpdatePlayers(match, player.Id); err != nil {
+			slog.Error("SearchMatchRoute: failed to update match players", "error", err)
+			return httpherlper.ErrorJsonResponse(c, http.StatusInternalServerError, lang.ERROR_UNEXPECTED)
+		}
 
 		if len(match.PlayersId) == int(match.RequiredPlayers) {
-			db.MatchmakingRepo.UpdateStatus(match, models.MATCHMAKING_STATUS_IN_PROGRESS)
+			if err := db.MatchmakingRepo.UpdateStatus(match, models.MATCHMAKING_STATUS_IN_PROGRESS); err != nil {
+				slog.Error("SearchMatchRoute: failed to update match status", "error", err)
+				return httpherlper.ErrorJsonResponse(c, http.StatusInternalServerError, lang.ERROR_UNEXPECTED)
+			}
 
 			for _, v := range match.PlayersId {
-				ssePlayer := db.SseListeningRepo.GetByUserId(v)
+				ssePlayer, err := db.SseListeningRepo.GetByUserId(v)
+				if err != nil {
+					slog.Error("SearchMatchRoute: failed to query SSE listening for player", "player_id", v, "error", err)
+					continue
+				}
 				sseCache := middleware.SseCacheData.GetBy(v)
 				if ssePlayer != nil && sseCache != nil {
 

@@ -68,6 +68,14 @@ make web
 
 The server listens on `0.0.0.0:8000`.
 
+### Database
+
+By default the server creates `web.db` in the working directory. Set `WEB_DB_DSN` to override (use `:memory:` for an ephemeral database):
+
+```sh
+WEB_DB_DSN=:memory: go run ./cmd/web.go
+```
+
 ### Run tests
 
 ```sh
@@ -89,7 +97,7 @@ go test ./...
 
 1. Client connects to `ws://localhost:8000/ws`.
 2. Server waits up to **10 seconds** for the auth message: `{"token":"..."}`.
-3. Server validates the token against the in-memory user repository.
+3. Server validates the token against the SQLite user repository.
 4. On success, the client is registered and receives:
    ```json
    {"type":"connected","socketId":"<uuid>"}
@@ -115,7 +123,7 @@ web/
 │   │       ├── matchmaking_handler.go  # WebSocket match-search handler
 │   │       └── *_test.go               # Unit tests
 │   ├── business/websocket/             # Message parser
-│   ├── db/                             # In-memory repositories
+│   ├── db/                             # SQLite repositories + DB init
 │   ├── middleware/                     # Auth + disabled SSE middleware
 │   ├── http_helper/                    # JSON error helpers
 │   ├── models/                         # Domain models + context keys
@@ -134,7 +142,7 @@ web/
 
 ## Current Limitations & Next Steps
 
-- **Storage is in-memory only.** SQLite persistence is planned.
+- **SQLite persistence is implemented.** `USER`, `USER_SESSION`, `USER_POINTS`, `MATCH`, `USER_MATCH`, and `GAME` tables are created; `USER` and `MATCH` tables are actively used.
 - **SSE match-notification is disabled.** The SPA now uses WebSocket matchmaking.
 - **Game Server integration is pending.** Full matches are notified over WebSocket but not yet forwarded to the Game Server.
 - See `TODO.md` for the full task list.

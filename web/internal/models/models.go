@@ -30,6 +30,7 @@ type FakeUserData struct {
 }
 
 type MatchmakingData struct {
+	Id              string
 	Game            string
 	CreatedAt       int64
 	UpdatedAt       int64
